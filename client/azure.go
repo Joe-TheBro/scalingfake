@@ -2,15 +2,38 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 )
 
 func chooseResourceGroupLocation() (string, error) {
-	// provided numbered list of resource groups
-	// user selects a resource group
-	// return the selected resource group
-	return "eastus", nil
+	azureLocations := []map[string]string{
+		{"name": "centralus", "city": "Chicago"},
+		{"name": "westcentralus", "city": "Wyoming"},
+		{"name": "westus2", "city": "Oregon"},
+		{"name": "westus", "city": "Los Angeles"},
+		{"name": "westus3", "city": "Arizona"},
+		{"name": "southcentralus", "city": "Texas"},
+		{"name": "canadacentral", "city": "Maine"},
+		{"name": "eastus", "city": "NYC"},
+	}
+
+	fmt.Println("Choose a location for the resource group:")
+	for i, location := range azureLocations {
+		fmt.Printf("%d) %s (%s)\n", i+1, location["city"], location["name"])
+	}
+	var choice int
+	_, err := fmt.Scan(&choice)
+	if err != nil {
+		return "", err
+	}
+	if choice < 1 || choice > len(azureLocations) {
+		fmt.Println("Invalid choice.")
+		fmt.Println("Please choose a location from the list:")
+		return chooseResourceGroupLocation()
+	}
+	return azureLocations[choice-1]["name"], nil
 }
 
 func allocateVM() {

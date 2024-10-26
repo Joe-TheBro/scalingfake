@@ -59,10 +59,10 @@ const (
 	nicName           = "sample-nic"
 	diskName          = "sample-disk"
 	publicIPName      = "sample-public-ip"
-	location          = "westus2"
 )
 
 var (
+	location               = "eastus"
 	resourcesClientFactory *armresources.ClientFactory
 	computeClientFactory   *armcompute.ClientFactory
 	networkClientFactory   *armnetwork.ClientFactory

@@ -606,6 +606,17 @@ func deleteDisk(ctx context.Context) error {
 	return nil
 }
 
+func allocateVM() {
+	//create virtual machine
+	var err error
+	location, err = chooseResourceGroupLocation()
+	if err != nil {
+		log.Printf("WARNING:cannot choose resource group location defaulting to eastus, error: %+v", err)
+	}
+	createVM()
+	defer cleanup()
+}
+
 // func main() {
 // 	subscriptionId = os.Getenv("AZURE_SUBSCRIPTION_ID")
 // 	if len(subscriptionId) == 0 {
@@ -620,8 +631,3 @@ func deleteDisk(ctx context.Context) error {
 // 		cleanup()
 // 	}
 // }
-
-func getPublicIP(ctx context.Context, authorizer autorest.Authorizer, resourceGroupName, vmName string) (string, error) {
-	// Add logic to retrieve the public IP of the created VM
-	return "xxx.xxx.xxx.xxx", nil
-}

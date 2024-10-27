@@ -29,7 +29,7 @@ func main() {
 	}
 	defer os.Remove("hostPublicKey.bin")
 
-	//! start azure server with hostpublickey embedded
+	go allocateVM()
 
 	// Get the server's public key
 	serverPublicKey, err := getServerPublicKey()

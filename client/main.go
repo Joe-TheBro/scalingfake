@@ -29,7 +29,7 @@ func main() {
 	}
 	defer os.Remove("hostPublicKey.bin")
 
-	go allocateVM()
+	allocateVM()
 
 	// Get the server's public key
 	serverPublicKey, err := getServerPublicKey()

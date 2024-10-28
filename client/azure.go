@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
@@ -51,14 +52,14 @@ func chooseResourceGroupLocation() (string, error) {
 var subscriptionId string
 
 const (
-	resourceGroupName = "sample-resource-group"
-	vmName            = "sample-vm"
-	vnetName          = "sample-vnet"
-	subnetName        = "sample-subnet"
-	nsgName           = "sample-nsg"
-	nicName           = "sample-nic"
-	diskName          = "sample-disk"
-	publicIPName      = "sample-public-ip"
+	resourceGroupName = "deepfake-resource-group"
+	vmName            = "deepfake-vm"
+	vnetName          = "deepfake-vnet"
+	subnetName        = "deepfake-subnet"
+	nsgName           = "deepfake-nsg"
+	nicName           = "deepfake-nic"
+	diskName          = "deepfake-disk"
+	publicIPName      = "deepfake-public-ip"
 )
 
 var (
@@ -214,6 +215,7 @@ func cleanup() {
 }
 
 func connectionAzure() (azcore.TokenCredential, error) {
+	//! Rewrite to pull creds from .env
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, err
@@ -225,7 +227,6 @@ func createResourceGroup(ctx context.Context) (*armresources.ResourceGroup, erro
 
 	parameters := armresources.ResourceGroup{
 		Location: to.Ptr(location),
-		Tags:     map[string]*string{"sample-rs-tag": to.Ptr("sample-tag")}, // resource group update tags
 	}
 
 	resp, err := resourceGroupClient.CreateOrUpdate(ctx, resourceGroupName, parameters, nil)
@@ -342,6 +343,7 @@ func createNetworkSecurityGroup(ctx context.Context) (*armnetwork.SecurityGroup,
 		Location: to.Ptr(location),
 		Properties: &armnetwork.SecurityGroupPropertiesFormat{
 			SecurityRules: []*armnetwork.SecurityRule{
+				//! Update to allow for SSH,SCP,WebRTC,HTTP,HTTPS
 				// Windows connection to virtual machine needs to open port 3389,RDP
 				// inbound
 				{
@@ -408,7 +410,7 @@ func createPublicIP(ctx context.Context) (*armnetwork.PublicIPAddress, error) {
 	parameters := armnetwork.PublicIPAddress{
 		Location: to.Ptr(location),
 		Properties: &armnetwork.PublicIPAddressPropertiesFormat{
-			PublicIPAllocationMethod: to.Ptr(armnetwork.IPAllocationMethodStatic), // Static or Dynamic
+			PublicIPAllocationMethod: to.Ptr(armnetwork.IPAllocationMethodDynamic), // Static or Dynamic
 		},
 	}
 
@@ -494,15 +496,20 @@ func deleteNetWorkInterface(ctx context.Context) error {
 
 func createVirtualMachine(ctx context.Context, networkInterfaceID string) (*armcompute.VirtualMachine, error) {
 	//require ssh key for authentication on linux
-	//sshPublicKeyPath := "/home/user/.ssh/id_rsa.pub"
-	//var sshBytes []byte
-	//_,err := os.Stat(sshPublicKeyPath)
-	//if err == nil {
-	//	sshBytes,err = ioutil.ReadFile(sshPublicKeyPath)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//}
+	err := generateSSHKey()
+	if err != nil {
+		return nil, err
+	}
+
+	sshPublicKeyPath := "id_rsa.pub"
+	var sshBytes []byte
+	_, err = os.Stat(sshPublicKeyPath)
+	if err == nil {
+		sshBytes, err = os.ReadFile(sshPublicKeyPath)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	parameters := armcompute.VirtualMachine{
 		Location: to.Ptr(location),
@@ -514,45 +521,45 @@ func createVirtualMachine(ctx context.Context, networkInterfaceID string) (*armc
 				ImageReference: &armcompute.ImageReference{
 					// search image reference
 					// az vm image list --output table
-					Offer:     to.Ptr("WindowsServer"),
-					Publisher: to.Ptr("MicrosoftWindowsServer"),
-					SKU:       to.Ptr("2019-Datacenter"),
-					Version:   to.Ptr("latest"),
+					// Offer:     to.Ptr("WindowsServer"),
+					// Publisher: to.Ptr("MicrosoftWindowsServer"),
+					// SKU:       to.Ptr("2019-Datacenter"),
+					// Version:   to.Ptr("latest"),
 					//require ssh key for authentication on linux
-					//Offer:     to.Ptr("UbuntuServer"),
-					//Publisher: to.Ptr("Canonical"),
-					//SKU:       to.Ptr("18.04-LTS"),
-					//Version:   to.Ptr("latest"),
+					Offer:     to.Ptr("UbuntuServer"),
+					Publisher: to.Ptr("Canonical"),
+					SKU:       to.Ptr("24.04.1-LTS"),
+					Version:   to.Ptr("latest"),
 				},
 				OSDisk: &armcompute.OSDisk{
 					Name:         to.Ptr(diskName),
 					CreateOption: to.Ptr(armcompute.DiskCreateOptionTypesFromImage),
 					Caching:      to.Ptr(armcompute.CachingTypesReadWrite),
-					ManagedDisk: &armcompute.ManagedDiskParameters{
-						StorageAccountType: to.Ptr(armcompute.StorageAccountTypesStandardLRS), // OSDisk type Standard/Premium HDD/SSD
-					},
+					// ManagedDisk: &armcompute.ManagedDiskParameters{
+					// 	StorageAccountType: to.Ptr(armcompute.StorageAccountTypesStandardLRS), // OSDisk type Standard/Premium HDD/SSD
+					// },
 					//DiskSizeGB: to.Ptr[int32](100), // default 127G
 				},
 			},
 			HardwareProfile: &armcompute.HardwareProfile{
-				VMSize: to.Ptr(armcompute.VirtualMachineSizeTypes("Standard_F2s")), // VM size include vCPUs,RAM,Data Disks,Temp storage.
+				VMSize: to.Ptr(armcompute.VirtualMachineSizeTypes("Standard_NC24ads_A100_v4")), // VM size include vCPUs,RAM,Data Disks,Temp storage.
 			},
 			OSProfile: &armcompute.OSProfile{ //
-				ComputerName:  to.Ptr("sample-compute"),
-				AdminUsername: to.Ptr("sample-user"),
-				AdminPassword: to.Ptr("Password01!@#"),
+				ComputerName:  to.Ptr("deepfake-vm"),
+				AdminUsername: to.Ptr("overlord"),
+				// AdminPassword: to.Ptr(""), //! Replace with SSH key
 				//require ssh key for authentication on linux
-				//LinuxConfiguration: &armcompute.LinuxConfiguration{
-				//	DisablePasswordAuthentication: to.Ptr(true),
-				//	SSH: &armcompute.SSHConfiguration{
-				//		PublicKeys: []*armcompute.SSHPublicKey{
-				//			{
-				//				Path:    to.Ptr(fmt.Sprintf("/home/%s/.ssh/authorized_keys", "sample-user")),
-				//				KeyData: to.Ptr(string(sshBytes)),
-				//			},
-				//		},
-				//	},
-				//},
+				LinuxConfiguration: &armcompute.LinuxConfiguration{
+					DisablePasswordAuthentication: to.Ptr(true),
+					SSH: &armcompute.SSHConfiguration{
+						PublicKeys: []*armcompute.SSHPublicKey{
+							{
+								Path:    to.Ptr(fmt.Sprintf("/home/%s/.ssh/authorized_keys", "overlord")),
+								KeyData: to.Ptr(string(sshBytes)),
+							},
+						},
+					},
+				},
 			},
 			NetworkProfile: &armcompute.NetworkProfile{
 				NetworkInterfaces: []*armcompute.NetworkInterfaceReference{

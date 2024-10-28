@@ -1,6 +1,10 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"os"
@@ -99,6 +103,49 @@ func runRemoteShellScript(ip, username, password, scriptPath string) error {
 	err = session.Run(fmt.Sprintf("sh %s", scriptPath))
 	if err != nil {
 		return fmt.Errorf("failed to run script: %v", err)
+	}
+
+	return nil
+}
+
+func generateSSHKey() error {
+	// open private and public key files
+	privateKeyFile, err := os.Create("id_rsa")
+	if err != nil {
+		return fmt.Errorf("failed to create private key file: %v", err)
+	}
+	defer privateKeyFile.Close()
+
+	publicKeyFile, err := os.Create("id_rsa.pub")
+	if err != nil {
+		return fmt.Errorf("failed to create public key file: %v", err)
+	}
+	defer publicKeyFile.Close()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return fmt.Errorf("failed to generate private key: %v", err)
+	}
+
+	privateKeyPEM := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}
+
+	err = pem.Encode(privateKeyFile, privateKeyPEM)
+	if err != nil {
+		return fmt.Errorf("failed to write private key: %v", err)
+	}
+
+	pub, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to generate public key: %v", err)
+	}
+
+	publicKeyBytes := ssh.MarshalAuthorizedKey(pub)
+	_, err = publicKeyFile.Write(publicKeyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to write public key: %v", err)
 	}
 
 	return nil

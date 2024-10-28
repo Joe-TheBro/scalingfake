@@ -8,11 +8,12 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
+// TODO: make the printing prettier
 func main() {
 	// Start RTMP server
 	fmt.Println("Starting RTMP server")
 	data := make(chan []byte)
-	go startRTMPServer(data)
+	go startRTMPServer(data) //TODO: add auth to RTMP server
 
 	// Generate a key pair for the host
 	fmt.Println("Generating public/private keys on host")
@@ -35,9 +36,11 @@ func main() {
 	fmt.Println("Allocating VM")
 	allocateVM()
 
+	//TODO: upload shell script and public key to VM
+
 	// Get the server's public key
 	fmt.Println("Getting server public key")
-	serverPublicKey, err := getServerPublicKey()
+	serverPublicKey, err := getServerPublicKey() // TODO: rewrite to use SCP
 	if err != nil {
 		fmt.Println("Error:", err)
 		return

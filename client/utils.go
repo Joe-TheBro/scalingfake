@@ -47,7 +47,7 @@ func continuouslyPing(sendChan chan<- string, done chan struct{}) {
 // 	config := &ssh.ClientConfig{
 // 		User: username,
 // 		Auth: []ssh.AuthMethod{
-// 			ssh.Password(password),
+// 			ssh.Password(password), //TODO: change to key
 // 		},
 // 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 // 	}

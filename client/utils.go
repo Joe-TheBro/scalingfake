@@ -10,7 +10,6 @@ import (
 	"os"
 	"time"
 
-	scp "github.com/bramvdbogaerde/go-scp"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -44,40 +43,40 @@ func continuouslyPing(sendChan chan<- string, done chan struct{}) {
 	}
 }
 
-func uploadFiles(ip, username, password, localFilePath, remoteFilePath string) error {
-	config := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
+// func uploadFiles(ip, username, password, localFilePath, remoteFilePath string) error {
+// 	config := &ssh.ClientConfig{
+// 		User: username,
+// 		Auth: []ssh.AuthMethod{
+// 			ssh.Password(password),
+// 		},
+// 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+// 	}
 
-	conn, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", ip), config)
-	if err != nil {
-		return fmt.Errorf("failed to connect: %v", err)
-	}
-	defer conn.Close()
+// 	conn, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", ip), config)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to connect: %v", err)
+// 	}
+// 	defer conn.Close()
 
-	session, err := conn.NewSession()
-	if err != nil {
-		return fmt.Errorf("failed to create session: %v", err)
-	}
-	defer session.Close()
+// 	session, err := conn.NewSession()
+// 	if err != nil {
+// 		return fmt.Errorf("failed to create session: %v", err)
+// 	}
+// 	defer session.Close()
 
-	file, err := os.Open(localFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to open local file: %v", err)
-	}
-	defer file.Close()
+// 	file, err := os.Open(localFilePath)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to open local file: %v", err)
+// 	}
+// 	defer file.Close()
 
-	err = scp.Copy(file, remoteFilePath, session)
-	if err != nil {
-		return fmt.Errorf("failed to upload file: %v", err)
-	}
+// 	err = scp.(file, remoteFilePath, session)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to upload file: %v", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func runRemoteShellScript(ip, username, password, scriptPath string) error {
 	config := &ssh.ClientConfig{

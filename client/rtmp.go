@@ -5,7 +5,9 @@ import (
 	"os/exec"
 )
 
-func startRTMPServer(data <-chan []byte) error {
+func startRTMPServer(data <-chan []byte, rtmpURL string) error {
+	rtmpURL := fmt.Sprintf("rtmp://localhost:1935/live/%s", streamKey)
+	
 	cmd := exec.Command("ffmpeg",
 		"-f", "rawvideo",
 		"-pixel_format", "bgr24",
@@ -16,7 +18,7 @@ func startRTMPServer(data <-chan []byte) error {
 		"-vcodec", "libx264",
 		"-preset", "ultrafast",
 		"-pix_fmt", "yuv420p",
-		"rtmp://localhost:1935/live/test")
+		rtmpURL)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

@@ -10,10 +10,28 @@ import (
 
 // TODO: make the printing prettier
 func main() {
+	//Generate thee stream key
+	streamKey, err := generateStreamKey()
+	if err != nil {
+		fmt.Println("Error generating stream key:", err)
+		return
+	}
+
+	// Full RTMP URL
+	rtmpURL := fmt.Sprintf("rtmp://localhost:1935/live/%s", streamKey)
+	fmt.Println("Generated URL:", rtmpURL)
+
+	
 	// Start RTMP server
-	fmt.Println("Starting RTMP server")
 	data := make(chan []byte)
-	go startRTMPServer(data) //TODO: add auth to RTMP server
+	fmt.Println("Starting RTMP server")
+	go func() {
+		err = startRTMPServer(data, rtmpURL)
+		if err != nil {
+			fmt.Println("Error starting RTMP server:", err)
+		}
+		
+	}() 
 
 	// Generate a key pair for the host
 	fmt.Println("Generating public/private keys on host")

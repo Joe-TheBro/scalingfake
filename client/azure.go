@@ -82,7 +82,7 @@ var (
 	disksClient           *armcompute.DisksClient
 )
 
-func createVM() {
+func createVM() *armnetwork.PublicIPAddress {
 	conn, err := connectionAzure()
 	if err != nil {
 		log.Fatalf("cannot connect to Azure:%+v", err)
@@ -158,6 +158,8 @@ func createVM() {
 	log.Printf("Created network virual machine: %s", *virtualMachine.ID)
 
 	log.Println("Virtual machine created successfully")
+
+	return publicIP
 }
 
 func cleanup() {
@@ -613,15 +615,16 @@ func deleteDisk(ctx context.Context) error {
 	return nil
 }
 
-func allocateVM() {
+func allocateVM() *armnetwork.PublicIPAddress {
 	//create virtual machine
 	var err error
 	location, err = chooseResourceGroupLocation()
 	if err != nil {
 		log.Printf("WARNING:cannot choose resource group location defaulting to eastus, error: %+v", err)
 	}
-	createVM()
+	publicIP := createVM()
 	defer cleanup()
+	return publicIP
 }
 
 // func main() {

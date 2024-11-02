@@ -34,22 +34,59 @@ func main() {
 
 	// Allocate a VM
 	fmt.Println("Allocating VM")
-	allocateVM()
+	publicIP := allocateVM()
+	if *publicIP.Properties.IPAddress == "" {
+		panic("Error allocating VM")
+	}
 
-	//TODO: upload shell script and public key to VM
+	//generate ssh keypair
+	fmt.Println("Generating SSH keypair")
+	err = generateSSHKey()
+
+	// Connect to the VM
+	fmt.Println("Connecting to VM via SSH")
+	ctxSSH := &SSHContext{
+		Host:           *publicIP.Properties.IPAddress,
+		Port:           22,
+		Username:       "overlord",
+		PrivateKeyPath: "id_rsa",
+		SSHClient:      nil,
+	}
+
+	var retry int = 0
+	for {
+		ctxSSH.SSHClient, err = connectSSH(ctxSSH)
+		if err != nil {
+			if retry < 10 {
+				fmt.Println("Error connecting to VM via SSH, retrying")
+				retry++
+				continue
+			}
+			fmt.Println("Error connecting to VM via SSH")
+			panic(err)
+		}
+		break
+	}
+
+	// setup server
+	fmt.Println("Setting up server")
+	err = setupServer(ctxSSH)
+	if err != nil {
+		fmt.Println("Error setting up server")
+		panic(err)
+	}
 
 	// Get the server's public key
 	fmt.Println("Getting server public key")
-	serverPublicKey, err := getServerPublicKey() // TODO: rewrite to use SCP
+	err = getServerPublicKey(ctxSSH)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 
-	fmt.Println("Received server public key")
-
 	// Compute the shared secret
 	fmt.Println("Computing shared secret")
+	serverPublicKey, err := os.ReadFile("serverPublicKey.bin")
 	sharedSecret, err := computeSharedSecret(hostPrivateKey, serverPublicKey)
 	if err != nil {
 		fmt.Println("Error computing shared secret")

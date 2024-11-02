@@ -1,20 +1,20 @@
 package main
 
 import (
-	"bufio"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha512"
-	"errors"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
-	"net"
-	"strings"
-	"time"
+	"os"
 
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
+	"golang.org/x/crypto/ssh"
 )
 
 func generateDHKeyPair() ([]byte, []byte, error) {
@@ -83,56 +83,51 @@ func decryptMessage(key, ciphertext []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-// Function to handle server messages
-func handleServerMessage(c net.Conn, sendChan chan<- string) []byte {
-	reader := bufio.NewReader(c)
-	for {
-		serverMessage, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("Error reading from connection:", err)
-			return nil
-		}
-		serverMessage = strings.TrimSuffix(serverMessage, "\n")
-		if serverMessage == "pong" {
-			// Send "publickey" request to the server
-			sendChan <- "publickey\n"
-		} else if strings.HasPrefix(serverMessage, "key:") {
-			serverPublicKeyString := strings.TrimPrefix(serverMessage, "key:")
-			serverPublicKey := []byte(serverPublicKeyString)
-			return serverPublicKey
-		}
-	}
+func getServerPublicKey(ctx *SSHContext) error {
+	copyFile(ctx, "serverPublicKey.bin", "serverPublicKey.bin")
+	fmt.Println("Received server public key")
+	return nil
 }
 
-// Start a listener and retrieve the server's public key
-func getServerPublicKey() ([]byte, error) {
-	var conn net.Conn
-	var err error
-
-	for {
-		conn, err = net.Dial("tcp", "localhost:9001")
-		if err == nil {
-			break
-		}
-		fmt.Println("Connection failed, retrying in 1 second...")
-		time.Sleep(1 * time.Second)
+func generateSSHKey() error {
+	// open private and public key files
+	privateKeyFile, err := os.Create("id_rsa")
+	if err != nil {
+		return fmt.Errorf("failed to create private key file: %v", err)
 	}
-	defer conn.Close()
+	defer privateKeyFile.Close()
 
-	// Channels for communication and synchronization
-	sendChan := make(chan string)
-	done := make(chan struct{})
-
-	// Start the write pump
-	go writePump(conn, sendChan, done)
-	// Start continuously sending "ping\n"
-	go continuouslyPing(sendChan, done)
-
-	// Handle incoming server messages
-	serverPublicKey := handleServerMessage(conn, sendChan)
-	close(done) // Signal goroutines to stop
-	if serverPublicKey == nil {
-		return nil, errors.New("failed to receive server public key")
+	publicKeyFile, err := os.Create("id_rsa.pub")
+	if err != nil {
+		return fmt.Errorf("failed to create public key file: %v", err)
 	}
-	return serverPublicKey, nil
+	defer publicKeyFile.Close()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return fmt.Errorf("failed to generate private key: %v", err)
+	}
+
+	privateKeyPEM := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}
+
+	err = pem.Encode(privateKeyFile, privateKeyPEM)
+	if err != nil {
+		return fmt.Errorf("failed to write private key: %v", err)
+	}
+
+	pub, err := ssh.NewPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to generate public key: %v", err)
+	}
+
+	publicKeyBytes := ssh.MarshalAuthorizedKey(pub)
+	_, err = publicKeyFile.Write(publicKeyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to write public key: %v", err)
+	}
+
+	return nil
 }

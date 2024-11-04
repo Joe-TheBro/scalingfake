@@ -1,55 +1,88 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"os/exec"
 )
 
-func startRTMPServer(data <-chan []byte) error {
-	cmd := exec.Command("ffmpeg",
-		"-f", "rawvideo",
-		"-pixel_format", "bgr24",
-		"-video_size", "640x480",
-		"-framerate", "30",
-		"-i", "pipe:0",
-		"-f", "flv",
-		"-vcodec", "libx264",
-		"-preset", "ultrafast",
-		"-pix_fmt", "yuv420p",
-		"rtmp://localhost:1935/live/test")
+type rtmpResult struct {
+	url string
+	err error
+}
 
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		fmt.Println("Error setting up ffmpeg stdin pipe:", err)
-		return err
+func generateStreamKey() (string, error) {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", errors.New("failed to generate stream key: " + err.Error())
 	}
+	return hex.EncodeToString(bytes), nil
+}
 
-	if err := cmd.Start(); err != nil {
-		fmt.Println("Error starting ffmpeg command:", err)
-		return err
-	}
+func startRTMPServer(data <-chan []byte) <-chan rtmpResult {
+	resultCh := make(chan rtmpResult)
 
-	// Read image bytes from the channel and write to ffmpeg stdin
-	for imgBytes := range data {
-		_, err = stdin.Write(imgBytes)
+	go func() {
+		defer close(resultCh)
+
+		// Generate a stream key
+		streamKey, err := generateStreamKey()
 		if err != nil {
-			fmt.Println("Error writing to ffmpeg stdin:", err)
-			break
+			resultCh <- rtmpResult{"", err}
+			return
 		}
-	}
 
-	// Close the stdin after the channel is closed
-	err = stdin.Close()
-	if err != nil {
-		fmt.Println("Error closing ffmpeg stdin:", err)
-		return err
-	}
+		// Full RTMP URL
+		rtmpURL := fmt.Sprintf("rtmp://localhost:1935/live/%s", streamKey)
+		fmt.Println("Generated URL:", rtmpURL)
 
-	// Wait for ffmpeg to finish
-	if err := cmd.Wait(); err != nil {
-		fmt.Println("Error waiting for ffmpeg command:", err)
-		return err
-	}
+		// Setup FFmpeg command
+		cmd := exec.Command("ffmpeg",
+			"-f", "rawvideo",
+			"-pixel_format", "bgr24",
+			"-video_size", "640x480",
+			"-framerate", "30",
+			"-i", "pipe:0",
+			"-f", "flv",
+			"-vcodec", "libx264",
+			"-preset", "ultrafast",
+			"-pix_fmt", "yuv420p",
+			rtmpURL)
 
-	return nil
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			resultCh <- rtmpResult{"", err}
+			return
+		}
+
+		// Start the command
+		if err := cmd.Start(); err != nil {
+			resultCh <- rtmpResult{"", err}
+			return
+		}
+
+		// Start reading from data channel and writing to FFmpeg stdin
+		go func() {
+			for imgBytes := range data {
+				_, err := stdin.Write(imgBytes)
+				if err != nil {
+					fmt.Println("Error writing to ffmpeg stdin:", err)
+					break
+				}
+			}
+			stdin.Close() // Close when channel closes
+		}()
+
+		// Wait for the FFmpeg process to complete
+		if err := cmd.Wait(); err != nil {
+			resultCh <- rtmpResult{"", err}
+			return
+		}
+
+		resultCh <- rtmpResult{rtmpURL, nil}
+	}()
+
+	return resultCh
 }

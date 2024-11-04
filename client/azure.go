@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+    "github.com/joho/godotenv"
 )
 
 func chooseResourceGroupLocation() (string, error) {
@@ -217,12 +218,26 @@ func cleanup() {
 }
 
 func connectionAzure() (azcore.TokenCredential, error) {
-	//! Rewrite to pull creds from .env
+	// Load environment variables from .env file
+    err := godotenv.Load()
+	if err != nil {
+        log.Printf("Error loading .env file: %v", err)
+    }
+
+	// Retrieve Azure credentials from environment variables
+	subscriptionId = os.Getenv("AZURE_SUBSCRIPTION_ID")
+
+	// Ensure all required environment variables are set
+    if subscriptionId == "" {
+        log.Fatal("Azure credentials AZURE_SUBSCRIPTION_ID is not set in .env file.")
+    }
+
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, err
 	}
 	return cred, nil
+	
 }
 
 func createResourceGroup(ctx context.Context) (*armresources.ResourceGroup, error) {

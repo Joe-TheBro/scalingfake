@@ -10,13 +10,20 @@ import (
 
 // TODO: make the printing prettier
 func main() {
-	// Start RTMP server
+	// Channel for RTMP data
 	rtmpData := make(chan []byte)
 	fmt.Println("Starting RTMP server")
+
+	// Start RTMP server asynchronously
+	resultCh := startRTMPServer(rtmpData)
+
+	// Process the result asynchronously
 	go func() {
-		_, err := startRTMPServer(rtmpData)
-		if err != nil {
-			fmt.Println("Error starting RTMP server:", err)
+		result := <-resultCh
+		if result.err != nil {
+			fmt.Println("Error starting RTMP server:", result.err)
+		} else {
+			fmt.Println("RTMP server started with URL:", result.url)
 		}
 	}()
 

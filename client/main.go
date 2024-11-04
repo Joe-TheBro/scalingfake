@@ -10,28 +10,15 @@ import (
 
 // TODO: make the printing prettier
 func main() {
-	//Generate thee stream key
-	streamKey, err := generateStreamKey()
-	if err != nil {
-		fmt.Println("Error generating stream key:", err)
-		return
-	}
-
-	// Full RTMP URL
-	rtmpURL := fmt.Sprintf("rtmp://localhost:1935/live/%s", streamKey)
-	fmt.Println("Generated URL:", rtmpURL)
-
-	
 	// Start RTMP server
-	data := make(chan []byte)
+	rtmpData := make(chan []byte)
 	fmt.Println("Starting RTMP server")
 	go func() {
-		err = startRTMPServer(data, rtmpURL)
+		_, err := startRTMPServer(rtmpData)
 		if err != nil {
 			fmt.Println("Error starting RTMP server:", err)
 		}
-		
-	}() 
+	}()
 
 	// Generate a key pair for the host
 	fmt.Println("Generating public/private keys on host")
@@ -110,6 +97,6 @@ func main() {
 	// Handle incoming tracks
 	fmt.Println("Waiting for deepfake video")
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		go handleIncomingTrack(track, data)
+		go handleIncomingTrack(track, rtmpData)
 	})
 }

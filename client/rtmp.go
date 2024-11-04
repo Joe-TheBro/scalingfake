@@ -1,13 +1,35 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"os/exec"
 )
 
-func startRTMPServer(data <-chan []byte, rtmpURL string) error {
+func generateStreamKey() (string, error) {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", errors.New("failed to generate stream key:" + err.Error())
+	}
+
+	streamKey := hex.EncodeToString(bytes)
+	return streamKey, nil
+}
+
+func startRTMPServer(data <-chan []byte) (string, error) {
+	// Generate a stream key
+	streamKey, err := generateStreamKey()
+	if err != nil {
+		fmt.Println("Error generating stream key:", err)
+		return "", err
+	}
+
+	// Full RTMP URL
 	rtmpURL := fmt.Sprintf("rtmp://localhost:1935/live/%s", streamKey)
-	
+	fmt.Println("Generated URL:", rtmpURL)
+
 	cmd := exec.Command("ffmpeg",
 		"-f", "rawvideo",
 		"-pixel_format", "bgr24",
@@ -23,12 +45,12 @@ func startRTMPServer(data <-chan []byte, rtmpURL string) error {
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		fmt.Println("Error setting up ffmpeg stdin pipe:", err)
-		return err
+		return "", err
 	}
 
 	if err := cmd.Start(); err != nil {
 		fmt.Println("Error starting ffmpeg command:", err)
-		return err
+		return "", err
 	}
 
 	// Read image bytes from the channel and write to ffmpeg stdin

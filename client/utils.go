@@ -149,14 +149,3 @@ func generateSSHKey() error {
 
 	return nil
 }
-
-
-func generateStreamKey() (string, error) {
-	bytes := make([]byte,16)
-	if _,err := rand.Read(bytes); err != nil {
-		return "", errors.New("failed to generate stream key:" + err.Error())
-	}
-
-	streamKey := hex.EncodeToString(bytes)
-	return streamKey, nil
-}

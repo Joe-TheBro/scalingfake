@@ -4,11 +4,30 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+type model int
+
+const (
+	listModel model = iota
+	logModel
 )
 
 type azureLocation struct {
 	name string
 	city string
+}
+
+type appModel struct {
+	model       model
+	selectedIdx int
+	logChannel  chan logMessage
+}
+
+type logMessage struct {
+	message    string
+	formatting lipgloss.Style
 }
 
 var azureLocations = []azureLocation{
@@ -22,108 +41,67 @@ var azureLocations = []azureLocation{
 	{"eastus", "NYC"},
 }
 
-type choiceModel struct {
-	cursor    int
-	locations []azureLocation
-	choice    string
+func (m appModel) Init() tea.Cmd {
+	if m.model == listModel {
+		return nil
+	}
+	return m.listenToLogs()
 }
 
-func (m choiceModel) Init() tea.Cmd {
-	return nil
-}
-
-func (m choiceModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "down", "j":
-			if m.cursor < len(m.choices)-1 {
-				m.cursor++
-			}
-		case "enter":
-			m.selected = true
-			return m, func() tea.Msg {
-				return selectionMsg{choice: m.choices[m.cursor]}
+func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch m.model {
+	case listModel:
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			case "j", "down":
+				if m.selectedIdx < len(azureLocations)-1 {
+					m.selectedIdx++
+				}
+			case "k", "up":
+				if m.selectedIdx > 0 {
+					m.selectedIdx--
+				}
+			case "enter":
+				m.model = logModel
+				m.logChannel = make(chan logMessage)
+				return m, m.listenToLogs()
 			}
 		}
+	case logModel:
+		switch msg := msg.(type) {
+		case logMessage:
+			style := msg.formatting
+			fmt.Sprintf("%s", style)
+		}
 	}
+
 	return m, nil
 }
 
-func (m choiceModel) View() string {
-	s := "Choose an option:\n\n"
-	for i, choice := range m.choices {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
+func (m appModel) View() string {
+	switch m.model {
+	case listModel:
+		return m.listView()
+	case logModel:
+		return m.logView()
+	default:
+		return "Unknown model state"
+	}
+}
+
+func (m appModel) listView() string {
+	var output string
+	output = "Select Azure Location (use up/down keys to navigate, 'enter' to select):\n\n"
+	for i, loc := range azureLocations {
+		if i == m.selectedIdx {
+			cityString := fmt.Sprintf("%s (%s)", loc.name, loc.city)
+			output += fmt.Sprintf("> %s\n", lipgloss.NewStyle().Bold(true).Render(cityString))
+		} else {
+			output += fmt.Sprintf("  %s (%s)\n", loc.name, loc.city)
 		}
-		s += fmt.Sprintf("%s %s\n", cursor, choice)
 	}
-	s += "\nPress q to quit."
-	return s
-}
-
-type logModel struct {
-	logs    []string
-	logChan chan string
-}
-
-func (m logModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" || msg.String() == "q" {
-			return m, tea.Quit
-		}
-	case selectionMsg:
-		return logsModel{logs: []string{fmt.Sprintf("Selected: %s", msg.choice)}}, nil
-	case logMsg:
-		m.logs = append(m.logs, msg.content)
-		return m, waitForLogMessage(m.logChan)
-	}
-	return m, nil
-}
-
-func (m logModel) View() string {
-	s := "Logs:\n\n"
-	for _, log := range m.logs {
-		s += fmt.Sprintf("%s\n", log)
-	}
-	s += "\nPress q to quit."
-	return s
-}
-
-type logMsg struct {
-	content string
-}
-
-type selectionMsg struct {
-	choice string
-}
-
-func initialChoiceModel() choiceModel {
-	return choiceModel{
-		locations: azureLocations,
-	}
-}
-
-func (m logModel) Init() tea.Cmd {
-	m.logChan = make(chan string)
-	go runBackgroundTasks(m.logChan)
-	return waitForLogMessage(m.logChan)
-}
-
-func waitForLogMessage(logChan <-chan string) tea.Cmd {
-	return func() tea.Msg {
-		msg, ok := <-logChan
-		if !ok {
-			return nil
-		}
-		return logMsg{content: msg}
-	}
+	return output
 }

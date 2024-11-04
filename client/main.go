@@ -8,6 +8,46 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
+// Config struct to hold configurable constants and parameters
+type Config struct {
+	RTMPServerURL       string
+	ServerPublicKeyFile string
+	// HostPrivateKeyFile string // unused
+	HostPublicKeyFile string
+	SSHPort           int
+	SSHUsername       string
+	SSHPrivateKeyPath string
+	SSHPublicKeyPath  string
+	PrivateKeyPath    string
+	MaxSSHRetries     int
+	FilePermissions   os.FileMode
+	SetupScriptFile   string
+}
+
+// InitializeConfig creates and returns the global configuration instance
+func InitializeConfig() Config {
+	return Config{
+		RTMPServerURL:       "rtmp://localhost:1935/live/",
+		ServerPublicKeyFile: "serverPublicKey.bin",
+		// HostPrivateKeyFile: "hostPrivateKey.bin", // unused
+		HostPublicKeyFile: "hostPublicKey.bin",
+		SSHPort:           22,
+		SSHUsername:       "overlord",
+		SSHPrivateKeyPath: "id_rsa",
+		SSHPublicKeyPath:  "id_rsa.pub",
+		MaxSSHRetries:     10,
+		FilePermissions:   0666,
+		SetupScriptFile:   "setup.sh",
+	}
+}
+
+// Global configuration instance
+var config Config
+
+func init() {
+	config = InitializeConfig()
+}
+
 // TODO: make the printing prettier
 func main() {
 	// Channel for RTMP data
@@ -37,12 +77,12 @@ func main() {
 
 	// Write the host public key to a file
 	fmt.Println("Have host public key, writing to file")
-	err = os.WriteFile("hostPublicKey.bin", hostPublicKey, 0666)
+	err = os.WriteFile(config.HostPublicKeyFile, hostPublicKey, config.FilePermissions)
 	if err != nil {
 		fmt.Println("Error writing host public key to file")
 		panic(err)
 	}
-	defer os.Remove("hostPublicKey.bin")
+	defer os.Remove(config.HostPublicKeyFile)
 
 	// Allocate a VM
 	fmt.Println("Allocating VM")
@@ -59,9 +99,9 @@ func main() {
 	fmt.Println("Connecting to VM via SSH")
 	ctxSSH := &SSHContext{
 		Host:           *publicIP.Properties.IPAddress,
-		Port:           22,
-		Username:       "overlord",
-		PrivateKeyPath: "id_rsa",
+		Port:           config.SSHPort,
+		Username:       config.SSHUsername,
+		PrivateKeyPath: config.PrivateKeyPath,
 		SSHClient:      nil,
 	}
 
@@ -69,7 +109,7 @@ func main() {
 	for {
 		ctxSSH.SSHClient, err = connectSSH(ctxSSH)
 		if err != nil {
-			if retry < 10 {
+			if retry < config.MaxSSHRetries {
 				fmt.Println("Error connecting to VM via SSH, retrying")
 				retry++
 				continue
@@ -98,7 +138,7 @@ func main() {
 
 	// Compute the shared secret
 	fmt.Println("Computing shared secret")
-	serverPublicKey, err := os.ReadFile("serverPublicKey.bin")
+	serverPublicKey, err := os.ReadFile(config.ServerPublicKeyFile)
 	sharedSecret, err := computeSharedSecret(hostPrivateKey, serverPublicKey)
 	if err != nil {
 		fmt.Println("Error computing shared secret")
@@ -123,7 +163,7 @@ func main() {
 
 	// Handle WebRTC signaling
 	fmt.Println("Starting encrypted WebRTC signaling")
-	conn, err := net.Dial("tcp", "localhost:9001")
+	conn, err := net.Dial("tcp", *publicIP.Properties.IPAddress+":9001")
 	if err != nil {
 		fmt.Println("Error connecting to server:", err)
 		panic(err)

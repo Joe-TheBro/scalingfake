@@ -106,13 +106,13 @@ func setupServer(ctx *SSHContext) error {
 	}
 
 	// Copy the host public key to the remote server
-	err = copyFile(ctx, "hostPublicKey.bin", "hostPublicKey.bin")
+	err = copyFile(ctx, config.HostPublicKeyFile, config.HostPublicKeyFile)
 
 	// Copy shellscript to the remote server
-	err = copyFile(ctx, "setup.sh", "setup.sh")
+	err = copyFile(ctx, config.SetupScriptFile, config.SetupScriptFile)
 
 	// Execute the shellscript on the remote server in background
-	err = executeCommand(ctx, "chmod +x setup.sh && ./setup.sh &")
+	err = executeCommand(ctx, "chmod +x "+config.SetupScriptFile+" "+"&& ./"+config.SetupScriptFile+" &")
 
 	return nil
 }

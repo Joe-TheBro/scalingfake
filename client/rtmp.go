@@ -35,7 +35,7 @@ func startRTMPServer(data <-chan []byte) <-chan rtmpResult {
 		}
 
 		// Full RTMP URL
-		rtmpURL := fmt.Sprintf("rtmp://localhost:1935/live/%s", streamKey)
+		rtmpURL := fmt.Sprintf(config.RTMPServerURL+"%v", streamKey)
 		fmt.Println("Generated URL:", rtmpURL)
 
 		// Setup FFmpeg command

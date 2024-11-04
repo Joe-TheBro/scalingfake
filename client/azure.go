@@ -261,7 +261,7 @@ func createVirtualNetwork(ctx context.Context) (*armnetwork.VirtualNetwork, erro
 		Properties: &armnetwork.VirtualNetworkPropertiesFormat{
 			AddressSpace: &armnetwork.AddressSpace{
 				AddressPrefixes: []*string{
-					to.Ptr("10.1.0.0/16"), // example 10.1.0.0/16
+					to.Ptr("10.1.1.0/24"), // holds 256 IP addresses 10.1.1.255
 				},
 			},
 			//Subnets: []*armnetwork.Subnet{
@@ -307,7 +307,7 @@ func createSubnets(ctx context.Context) (*armnetwork.Subnet, error) {
 
 	parameters := armnetwork.Subnet{
 		Properties: &armnetwork.SubnetPropertiesFormat{
-			AddressPrefix: to.Ptr("10.1.10.0/24"),
+			AddressPrefix: to.Ptr("10.1.1.0/24"),
 		},
 	}
 
@@ -340,16 +340,13 @@ func deleteSubnets(ctx context.Context) error {
 }
 
 func createNetworkSecurityGroup(ctx context.Context) (*armnetwork.SecurityGroup, error) {
-
 	parameters := armnetwork.SecurityGroup{
 		Location: to.Ptr(location),
 		Properties: &armnetwork.SecurityGroupPropertiesFormat{
 			SecurityRules: []*armnetwork.SecurityRule{
-				//! Update to allow for SSH,SCP,WebRTC,HTTP,HTTPS
-				// Windows connection to virtual machine needs to open port 3389,RDP
-				// inbound
+				// Inbound SSH/SCP port 22
 				{
-					Name: to.Ptr("sample_inbound_22"), //
+					Name: to.Ptr("inbound_22"),
 					Properties: &armnetwork.SecurityRulePropertiesFormat{
 						SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
 						SourcePortRange:          to.Ptr("*"),
@@ -358,13 +355,13 @@ func createNetworkSecurityGroup(ctx context.Context) (*armnetwork.SecurityGroup,
 						Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
 						Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
 						Priority:                 to.Ptr[int32](100),
-						Description:              to.Ptr("sample network security group inbound port 22"),
+						Description:              to.Ptr("Allow inbound SSH/SCP traffic on port 22"),
 						Direction:                to.Ptr(armnetwork.SecurityRuleDirectionInbound),
 					},
 				},
-				// outbound
+				// Outbound SSH/SCP port 22
 				{
-					Name: to.Ptr("sample_outbound_22"), //
+					Name: to.Ptr("outbound_22"),
 					Properties: &armnetwork.SecurityRulePropertiesFormat{
 						SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
 						SourcePortRange:          to.Ptr("*"),
@@ -373,7 +370,127 @@ func createNetworkSecurityGroup(ctx context.Context) (*armnetwork.SecurityGroup,
 						Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
 						Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
 						Priority:                 to.Ptr[int32](100),
-						Description:              to.Ptr("sample network security group outbound port 22"),
+						Description:              to.Ptr("Allow outbound SSH/SCP traffic on port 22"),
+						Direction:                to.Ptr(armnetwork.SecurityRuleDirectionOutbound),
+					},
+				},
+				// Inbound HTTP port 80
+				{
+					Name: to.Ptr("inbound_80"),
+					Properties: &armnetwork.SecurityRulePropertiesFormat{
+						SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+						SourcePortRange:          to.Ptr("*"),
+						DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+						DestinationPortRange:     to.Ptr("80"),
+						Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
+						Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+						Priority:                 to.Ptr[int32](110),
+						Description:              to.Ptr("Allow inbound HTTP traffic on port 80"),
+						Direction:                to.Ptr(armnetwork.SecurityRuleDirectionInbound),
+					},
+				},
+				// Outbound HTTP port 80
+				{
+					Name: to.Ptr("outbound_80"),
+					Properties: &armnetwork.SecurityRulePropertiesFormat{
+						SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+						SourcePortRange:          to.Ptr("*"),
+						DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+						DestinationPortRange:     to.Ptr("80"),
+						Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
+						Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+						Priority:                 to.Ptr[int32](110),
+						Description:              to.Ptr("Allow outbound HTTP traffic on port 80"),
+						Direction:                to.Ptr(armnetwork.SecurityRuleDirectionOutbound),
+					},
+				},
+				// Inbound HTTPS port 443
+				{
+					Name: to.Ptr("inbound_443"),
+					Properties: &armnetwork.SecurityRulePropertiesFormat{
+						SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+						SourcePortRange:          to.Ptr("*"),
+						DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+						DestinationPortRange:     to.Ptr("443"),
+						Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
+						Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+						Priority:                 to.Ptr[int32](120),
+						Description:              to.Ptr("Allow inbound HTTPS traffic on port 443"),
+						Direction:                to.Ptr(armnetwork.SecurityRuleDirectionInbound),
+					},
+				},
+				// Outbound HTTPS port 443
+				{
+					Name: to.Ptr("outbound_443"),
+					Properties: &armnetwork.SecurityRulePropertiesFormat{
+						SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+						SourcePortRange:          to.Ptr("*"),
+						DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+						DestinationPortRange:     to.Ptr("443"),
+						Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
+						Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+						Priority:                 to.Ptr[int32](120),
+						Description:              to.Ptr("Allow outbound HTTPS traffic on port 443"),
+						Direction:                to.Ptr(armnetwork.SecurityRuleDirectionOutbound),
+					},
+				},
+				// Inbound TCP port 9001
+				{
+					Name: to.Ptr("inbound_9001"),
+					Properties: &armnetwork.SecurityRulePropertiesFormat{
+						SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+						SourcePortRange:          to.Ptr("*"),
+						DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+						DestinationPortRange:     to.Ptr("9001"),
+						Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
+						Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+						Priority:                 to.Ptr[int32](130),
+						Description:              to.Ptr("Allow inbound TCP traffic on port 9001"),
+						Direction:                to.Ptr(armnetwork.SecurityRuleDirectionInbound),
+					},
+				},
+				// Outbound TCP port 9001
+				{
+					Name: to.Ptr("outbound_9001"),
+					Properties: &armnetwork.SecurityRulePropertiesFormat{
+						SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+						SourcePortRange:          to.Ptr("*"),
+						DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+						DestinationPortRange:     to.Ptr("9001"),
+						Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolTCP),
+						Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+						Priority:                 to.Ptr[int32](130),
+						Description:              to.Ptr("Allow outbound TCP traffic on port 9001"),
+						Direction:                to.Ptr(armnetwork.SecurityRuleDirectionOutbound),
+					},
+				},
+				// Inbound WebRTC UDP ports 16384-32767
+				{
+					Name: to.Ptr("inbound_webrtc"),
+					Properties: &armnetwork.SecurityRulePropertiesFormat{
+						SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+						SourcePortRange:          to.Ptr("*"),
+						DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+						DestinationPortRanges:    []*string{to.Ptr("16384-32767")},
+						Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolUDP),
+						Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+						Priority:                 to.Ptr[int32](140),
+						Description:              to.Ptr("Allow inbound WebRTC traffic on UDP ports 16384-32767"),
+						Direction:                to.Ptr(armnetwork.SecurityRuleDirectionInbound),
+					},
+				},
+				// Outbound WebRTC UDP ports 16384-32767
+				{
+					Name: to.Ptr("outbound_webrtc"),
+					Properties: &armnetwork.SecurityRulePropertiesFormat{
+						SourceAddressPrefix:      to.Ptr("0.0.0.0/0"),
+						SourcePortRange:          to.Ptr("*"),
+						DestinationAddressPrefix: to.Ptr("0.0.0.0/0"),
+						DestinationPortRanges:    []*string{to.Ptr("16384-32767")},
+						Protocol:                 to.Ptr(armnetwork.SecurityRuleProtocolUDP),
+						Access:                   to.Ptr(armnetwork.SecurityRuleAccessAllow),
+						Priority:                 to.Ptr[int32](140),
+						Description:              to.Ptr("Allow outbound WebRTC traffic on UDP ports 16384-32767"),
 						Direction:                to.Ptr(armnetwork.SecurityRuleDirectionOutbound),
 					},
 				},
@@ -503,7 +620,7 @@ func createVirtualMachine(ctx context.Context, networkInterfaceID string) (*armc
 		return nil, err
 	}
 
-	sshPublicKeyPath := "id_rsa.pub"
+	sshPublicKeyPath := config.SSHPublicKeyPath
 	var sshBytes []byte
 	_, err = os.Stat(sshPublicKeyPath)
 	if err == nil {
@@ -548,7 +665,7 @@ func createVirtualMachine(ctx context.Context, networkInterfaceID string) (*armc
 			},
 			OSProfile: &armcompute.OSProfile{ //
 				ComputerName:  to.Ptr("deepfake-vm"),
-				AdminUsername: to.Ptr("overlord"),
+				AdminUsername: to.Ptr(config.SSHUsername),
 				// AdminPassword: to.Ptr(""), //! Replace with SSH key
 				//require ssh key for authentication on linux
 				LinuxConfiguration: &armcompute.LinuxConfiguration{
@@ -556,7 +673,7 @@ func createVirtualMachine(ctx context.Context, networkInterfaceID string) (*armc
 					SSH: &armcompute.SSHConfiguration{
 						PublicKeys: []*armcompute.SSHPublicKey{
 							{
-								Path:    to.Ptr(fmt.Sprintf("/home/%s/.ssh/authorized_keys", "overlord")),
+								Path:    to.Ptr(fmt.Sprintf("/home/%s/.ssh/authorized_keys", config.SSHUsername)),
 								KeyData: to.Ptr(string(sshBytes)),
 							},
 						},

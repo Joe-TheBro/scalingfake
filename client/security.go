@@ -84,20 +84,20 @@ func decryptMessage(key, ciphertext []byte) ([]byte, error) {
 }
 
 func getServerPublicKey(ctx *SSHContext) error {
-	copyFile(ctx, "serverPublicKey.bin", "serverPublicKey.bin")
+	copyFile(ctx, config.ServerPublicKeyFile, config.ServerPublicKeyFile)
 	fmt.Println("Received server public key")
 	return nil
 }
 
 func generateSSHKey() error {
 	// open private and public key files
-	privateKeyFile, err := os.Create("id_rsa")
+	privateKeyFile, err := os.Create(config.SSHPrivateKeyPath)
 	if err != nil {
 		return fmt.Errorf("failed to create private key file: %v", err)
 	}
 	defer privateKeyFile.Close()
 
-	publicKeyFile, err := os.Create("id_rsa.pub")
+	publicKeyFile, err := os.Create(config.SSHPublicKeyPath)
 	if err != nil {
 		return fmt.Errorf("failed to create public key file: %v", err)
 	}

@@ -12,37 +12,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
-    "github.com/joho/godotenv"
+	"github.com/joho/godotenv"
 )
-
-func chooseResourceGroupLocation() (string, error) {
-	azureLocations := []map[string]string{
-		{"name": "centralus", "city": "Chicago"},
-		{"name": "westcentralus", "city": "Wyoming"},
-		{"name": "westus2", "city": "Oregon"},
-		{"name": "westus", "city": "Los Angeles"},
-		{"name": "westus3", "city": "Arizona"},
-		{"name": "southcentralus", "city": "Texas"},
-		{"name": "canadacentral", "city": "Maine"},
-		{"name": "eastus", "city": "NYC"},
-	}
-
-	fmt.Println("Choose a location for the resource group:")
-	for i, location := range azureLocations {
-		fmt.Printf("%d) %s (%s)\n", i+1, location["city"], location["name"])
-	}
-	var choice int
-	_, err := fmt.Scan(&choice)
-	if err != nil {
-		return "", err
-	}
-	if choice < 1 || choice > len(azureLocations) {
-		fmt.Println("Invalid choice.")
-		fmt.Println("Please choose a location from the list:")
-		return chooseResourceGroupLocation()
-	}
-	return azureLocations[choice-1]["name"], nil
-}
 
 // https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal
 // Subscription ID AZURE_SUBSCRIPTION_ID
@@ -219,25 +190,25 @@ func cleanup() {
 
 func connectionAzure() (azcore.TokenCredential, error) {
 	// Load environment variables from .env file
-    err := godotenv.Load()
+	err := godotenv.Load()
 	if err != nil {
-        log.Printf("Error loading .env file: %v", err)
-    }
+		log.Printf("Error loading .env file: %v", err)
+	}
 
 	// Retrieve Azure credentials from environment variables
 	subscriptionId = os.Getenv("AZURE_SUBSCRIPTION_ID")
 
 	// Ensure all required environment variables are set
-    if subscriptionId == "" {
-        log.Fatal("Azure credentials AZURE_SUBSCRIPTION_ID is not set in .env file.")
-    }
+	if subscriptionId == "" {
+		log.Fatal("Azure credentials AZURE_SUBSCRIPTION_ID is not set in .env file.")
+	}
 
 	cred, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, err
 	}
 	return cred, nil
-	
+
 }
 
 func createResourceGroup(ctx context.Context) (*armresources.ResourceGroup, error) {

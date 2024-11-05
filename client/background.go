@@ -50,7 +50,6 @@ func init() {
 	config = InitializeConfig()
 }
 
-// TODO: make the printing prettier
 func background_main() {
 	// Channel for RTMP data
 	rtmpData := make(chan []byte)

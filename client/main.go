@@ -15,6 +15,15 @@ var logChan chan logMessage
 
 type viewState int
 
+var logStyles = map[string]lipgloss.Style{
+	"background": lipgloss.NewStyle().Background(lipgloss.Color("235")),
+	"debug":      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+	"info":       lipgloss.NewStyle().Foreground(lipgloss.Color("205")),
+	"error":      lipgloss.NewStyle().Foreground(lipgloss.Color("196")),
+	"warning":    lipgloss.NewStyle().Foreground(lipgloss.Color("220")),
+	"critical":   lipgloss.NewStyle().Foreground(lipgloss.Color("196")),
+}
+
 type item struct {
 	title, desc string
 }
@@ -64,6 +73,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.state == initialView {
 				location = azureLocations[m.list.Cursor()].(item).title
+				go background_main()
 				return m, m.switchToLogView()
 			}
 		case "t":
@@ -122,7 +132,7 @@ func main() {
 	m := model{
 		state:     initialView,
 		logChan:   logChan,
-		logBuffer: logBuffer, // TODO: This doesn't work :) Need to fix it
+		logBuffer: logBuffer,
 		list:      list.New(azureLocations, list.NewDefaultDelegate(), 0, 0),
 	}
 	m.list.Title = "Azure Locations"

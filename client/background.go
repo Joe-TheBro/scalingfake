@@ -22,6 +22,7 @@ type Config struct {
 	MaxSSHRetries     int
 	FilePermissions   os.FileMode
 	SetupScriptFile   string
+	CameraIndex       int
 }
 
 // InitializeConfig creates and returns the global configuration instance
@@ -38,6 +39,7 @@ func InitializeConfig() Config {
 		MaxSSHRetries:     10,
 		FilePermissions:   0666,
 		SetupScriptFile:   "setup.sh",
+		CameraIndex:       0,
 	}
 }
 

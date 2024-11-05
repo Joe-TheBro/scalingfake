@@ -27,7 +27,7 @@ func createPeerConnection() (*webrtc.PeerConnection, error) {
 }
 
 func sendLocalCamera(peerConnection *webrtc.PeerConnection) error {
-	webcam, err := gocv.OpenVideoCapture(0) // Adjust camera index as needed
+	webcam, err := gocv.OpenVideoCapture(config.CameraIndex) // Adjust camera index as needed
 	if err != nil {
 		return err
 	}
@@ -72,7 +72,7 @@ func decodeRTPPacketToFrame(packet rtp.Packet) (gocv.Mat, error) {
 }
 
 func encodeFrameToSample(img gocv.Mat) (media.Sample, error) {
-	encodedFrame, err := gocv.IMEncode(".jpg", img)
+	encodedFrame, err := gocv.IMEncode(".png", img)
 	if err != nil {
 		return media.Sample{}, err
 	}

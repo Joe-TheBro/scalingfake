@@ -35,13 +35,12 @@ const (
 )
 
 var (
-	location               = "eastus"
+	location = "eastus"
+
 	resourcesClientFactory *armresources.ClientFactory
 	computeClientFactory   *armcompute.ClientFactory
 	networkClientFactory   *armnetwork.ClientFactory
-)
 
-var (
 	resourceGroupClient *armresources.ResourceGroupsClient
 
 	virtualNetworksClient   *armnetwork.VirtualNetworksClient
@@ -720,11 +719,6 @@ func deleteDisk(ctx context.Context) error {
 
 func allocateVM() *armnetwork.PublicIPAddress {
 	//create virtual machine
-	var err error
-	location, err = chooseResourceGroupLocation()
-	if err != nil {
-		log.Printf("WARNING:cannot choose resource group location defaulting to eastus, error: %+v", err)
-	}
 	publicIP := createVM()
 	defer cleanup()
 	return publicIP

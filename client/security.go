@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/charmbracelet/log"
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/ssh"
@@ -85,7 +86,7 @@ func decryptMessage(key, ciphertext []byte) ([]byte, error) {
 
 func getServerPublicKey(ctx *SSHContext) error {
 	copyFile(ctx, config.ServerPublicKeyFile, config.ServerPublicKeyFile)
-	fmt.Println("Received server public key")
+	log.Info("Received server public key")
 	return nil
 }
 

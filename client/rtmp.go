@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+
+	"github.com/charmbracelet/log"
 )
 
 type rtmpResult struct {
@@ -36,7 +38,7 @@ func startRTMPServer(data <-chan []byte) <-chan rtmpResult {
 
 		// Full RTMP URL
 		rtmpURL := fmt.Sprintf(config.RTMPServerURL+"%v", streamKey)
-		fmt.Println("Generated URL:", rtmpURL)
+		log.Infof("Generated URL: %v", rtmpURL)
 
 		// Setup FFmpeg command
 		cmd := exec.Command("ffmpeg",
@@ -68,7 +70,7 @@ func startRTMPServer(data <-chan []byte) <-chan rtmpResult {
 			for imgBytes := range data {
 				_, err := stdin.Write(imgBytes)
 				if err != nil {
-					fmt.Println("Error writing to ffmpeg stdin:", err)
+					log.Fatal("Error writing to ffmpeg stdin:", err)
 					break
 				}
 			}

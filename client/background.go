@@ -1,10 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"net"
 	"os"
 
+	"github.com/charmbracelet/log"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -53,7 +53,7 @@ func init() {
 func background_main() {
 	// Channel for RTMP data
 	rtmpData := make(chan []byte)
-	fmt.Println("Starting RTMP server")
+	log.Info("Starting RTMP server...")
 
 	// Start RTMP server asynchronously
 	resultCh := startRTMPServer(rtmpData)
@@ -62,42 +62,43 @@ func background_main() {
 	go func() {
 		result := <-resultCh
 		if result.err != nil {
-			fmt.Println("Error starting RTMP server:", result.err)
+			log.Fatal("Error starting RTMP server:", result.err)
 		} else {
-			fmt.Println("RTMP server started with URL:", result.url)
+			log.Info("RTMP server started with URL:", result.url)
 		}
 	}()
 
 	// Generate a key pair for the host
-	fmt.Println("Generating public/private keys on host")
+	log.Info("Generating public/private keys on host")
 	hostPublicKey, hostPrivateKey, err := generateDHKeyPair()
 	if err != nil {
-		fmt.Println("Error generating public/private keys on host")
-		panic(err)
+		log.Fatal("Error generating public/private keys on host", err)
 	}
 
 	// Write the host public key to a file
-	fmt.Println("Have host public key, writing to file")
+	log.Info("Have host public key, writing to file")
 	err = os.WriteFile(config.HostPublicKeyFile, hostPublicKey, config.FilePermissions)
 	if err != nil {
-		fmt.Println("Error writing host public key to file")
-		panic(err)
+		log.Fatal("Error writing host public key to file", err)
 	}
 	defer os.Remove(config.HostPublicKeyFile)
 
 	// Allocate a VM
-	fmt.Println("Allocating VM")
+	log.Info("Allocating VM")
 	publicIP := allocateVM()
 	if *publicIP.Properties.IPAddress == "" {
-		panic("Error allocating VM")
+		log.Fatal("Error allocating VM, no public IP address")
 	}
 
 	//generate ssh keypair
-	fmt.Println("Generating SSH keypair")
+	log.Info("Generating SSH key pair...")
 	err = generateSSHKey()
+	if err != nil {
+		log.Fatal("Error generating SSH key pair", err)
+	}
 
 	// Connect to the VM
-	fmt.Println("Connecting to VM via SSH")
+	log.Info("Connecting to VM via SSH...")
 	ctxSSH := &SSHContext{
 		Host:           *publicIP.Properties.IPAddress,
 		Port:           config.SSHPort,
@@ -111,76 +112,71 @@ func background_main() {
 		ctxSSH.SSHClient, err = connectSSH(ctxSSH)
 		if err != nil {
 			if retry < config.MaxSSHRetries {
-				fmt.Println("Error connecting to VM via SSH, retrying")
+				log.Warn("Error connecting to VM via SSH, retrying")
 				retry++
 				continue
 			}
-			fmt.Println("Error connecting to VM via SSH")
-			panic(err)
+			log.Fatal("Failed connecting to VM via SSH", err)
 		}
 		break
 	}
 
 	// setup server
-	fmt.Println("Setting up server")
+	log.Info("Setting up server...")
 	err = setupServer(ctxSSH)
 	if err != nil {
-		fmt.Println("Error setting up server")
-		panic(err)
+		log.Fatal("Error setting up server...", err)
 	}
 
 	// Get the server's public key
-	fmt.Println("Getting server public key")
-	err = getServerPublicKey(ctxSSH)
+	log.Info("Getting server public key...")
+	err = getServerPublicKey(ctxSSH) //! Possible race condition
 	if err != nil {
-		fmt.Println("Error:", err)
-		return
+		log.Fatal("Failed retrieving public key...", err)
 	}
 
 	// Compute the shared secret
-	fmt.Println("Computing shared secret")
+	log.Info("Computing shared secret")
 	serverPublicKey, err := os.ReadFile(config.ServerPublicKeyFile)
+	if err != nil {
+		log.Fatal("Error reading server public key", err)
+	}
 	sharedSecret, err := computeSharedSecret(hostPrivateKey, serverPublicKey)
 	if err != nil {
-		fmt.Println("Error computing shared secret")
-		panic(err)
+		log.Fatal("Error computing shared secret", err)
 	}
 
 	// Derive the encryption key
-	fmt.Println("Deriving encryption key")
+	log.Info("Deriving encryption key")
 	encryptionKey, err := deriveEncryptionKey(sharedSecret)
 	if err != nil {
-		fmt.Println("Error deriving encryption key")
-		panic(err)
+		log.Fatal("Error deriving encryption key", err)
 	}
 
 	// Create a WebRTC peer connection
-	fmt.Println("Establishing WebRTC connection")
+	log.Info("Establishing WebRTC connection")
 	peerConnection, err := createPeerConnection()
 	if err != nil {
-		fmt.Println("Error creating peer connection")
-		panic(err)
+		log.Fatal("Error creating peer connection", err)
 	}
 
 	// Handle WebRTC signaling
-	fmt.Println("Starting encrypted WebRTC signaling")
+	log.Info("Starting encrypted WebRTC signaling")
 	conn, err := net.Dial("tcp", *publicIP.Properties.IPAddress+":9001")
 	if err != nil {
-		fmt.Println("Error connecting to server:", err)
-		panic(err)
+		log.Fatal("Error connecting to server:", err)
 	}
 	defer conn.Close()
 	handleWebRTCSignaling(conn, encryptionKey, peerConnection)
 
 	// Send the local camera feed
-	fmt.Println("Sending camera feed")
+	log.Info("Sending camera feed")
 	if err := sendLocalCamera(peerConnection); err != nil {
-		fmt.Println("Error sending local camera")
-		panic(err)
+		log.Fatal("Error sending local camera", err)
 	}
 
 	// Handle incoming tracks
-	fmt.Println("Waiting for deepfake video")
+	log.Info("Waiting for deepfake video")
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		go handleIncomingTrack(track, rtmpData)
 	})

@@ -7,22 +7,12 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
 )
 
 var docStyle = lipgloss.NewStyle().Margin(1, 2)
 
-var logChan chan logMessage
-
 type viewState int
-
-var logStyles = map[string]lipgloss.Style{
-	"background": lipgloss.NewStyle().Background(lipgloss.Color("235")),
-	"debug":      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-	"info":       lipgloss.NewStyle().Foreground(lipgloss.Color("205")),
-	"error":      lipgloss.NewStyle().Foreground(lipgloss.Color("196")),
-	"warning":    lipgloss.NewStyle().Foreground(lipgloss.Color("220")),
-	"critical":   lipgloss.NewStyle().Foreground(lipgloss.Color("196")),
-}
 
 type item struct {
 	title, desc string
@@ -49,15 +39,14 @@ const (
 )
 
 type model struct {
-	state     viewState
-	logChan   chan logMessage
-	logBuffer string
-	list      list.Model
+	state viewState
+	log   *log.Logger
+	list  list.Model
 }
 
 func (m *model) switchToLogView() tea.Cmd {
 	m.state = logView
-	return waitForLog(m.logChan)
+	return nil
 }
 
 func (m *model) Init() tea.Cmd {
@@ -76,17 +65,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				go background_main()
 				return m, m.switchToLogView()
 			}
-		case "t":
-			sendLogMessage("This is a test message", lipgloss.NewStyle().Foreground(lipgloss.Color("205")))
+			// case "t":
+			// 	log.Debug("t pressed")
 		}
-
-	case logMessage:
-		if m.state == logView {
-			formattedMsg := msg.format.Render(msg.msg)
-			m.logBuffer += fmt.Sprintf("%s\n", formattedMsg)
-			return m, waitForLog(m.logChan)
-		}
-
 	case tea.WindowSizeMsg:
 		h, v := docStyle.GetFrameSize()
 		m.list.SetSize(msg.Width-h, msg.Height-v)
@@ -104,36 +85,22 @@ func (m *model) View() string {
 	case initialView:
 		return docStyle.Render(m.list.View())
 	case logView:
-		return docStyle.Render(m.logBuffer)
+		// clear the screen
+		fmt.Print("\033[H\033[2J")
+		return docStyle.Render() // This works, trust me
 	default:
 		return ""
 	}
 }
 
-type logMessage struct {
-	msg    string
-	format lipgloss.Style
-}
-
-func waitForLog(logChan chan logMessage) tea.Cmd {
-	return func() tea.Msg {
-		return logMessage(<-logChan)
-	}
-}
-
-func sendLogMessage(msg string, format lipgloss.Style) {
-	logChan <- logMessage{msg: msg, format: format}
-}
-
 func main() {
-	logChan = make(chan logMessage)
-	logBuffer := ""
+	log.SetLevel(log.DebugLevel)
+	log.SetReportCaller(true)
 
 	m := model{
-		state:     initialView,
-		logChan:   logChan,
-		logBuffer: logBuffer,
-		list:      list.New(azureLocations, list.NewDefaultDelegate(), 0, 0),
+		state: initialView,
+		log:   log.Default(),
+		list:  list.New(azureLocations, list.NewDefaultDelegate(), 0, 0),
 	}
 	m.list.Title = "Azure Locations"
 

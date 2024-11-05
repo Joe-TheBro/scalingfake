@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -12,6 +11,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/charmbracelet/log"
 	"github.com/joho/godotenv"
 )
 
@@ -56,7 +56,7 @@ var (
 func createVM() *armnetwork.PublicIPAddress {
 	conn, err := connectionAzure()
 	if err != nil {
-		log.Fatalf("cannot connect to Azure:%+v", err)
+		log.Fatal("cannot connect to Azure:%+v", err)
 	}
 	ctx := context.Background()
 
@@ -83,52 +83,52 @@ func createVM() *armnetwork.PublicIPAddress {
 	virtualMachinesClient = computeClientFactory.NewVirtualMachinesClient()
 	disksClient = computeClientFactory.NewDisksClient()
 
-	log.Println("start creating virtual machine...")
+	log.Info("Starting to create virtual machine...")
 	resourceGroup, err := createResourceGroup(ctx)
 	if err != nil {
-		log.Fatalf("cannot create resource group:%+v", err)
+		log.Fatal("cannot create resource group:%+v", err)
 	}
-	log.Printf("Created resource group: %s", *resourceGroup.ID)
+	log.Info("Created resource group: %s", *resourceGroup.ID)
 
 	virtualNetwork, err := createVirtualNetwork(ctx)
 	if err != nil {
-		log.Fatalf("cannot create virtual network:%+v", err)
+		log.Fatal("cannot create virtual network:%+v", err)
 	}
-	log.Printf("Created virtual network: %s", *virtualNetwork.ID)
+	log.Info("Created virtual network: %s", *virtualNetwork.ID)
 
 	subnet, err := createSubnets(ctx)
 	if err != nil {
-		log.Fatalf("cannot create subnet:%+v", err)
+		log.Fatal("cannot create subnet:%+v", err)
 	}
-	log.Printf("Created subnet: %s", *subnet.ID)
+	log.Info("Created subnet: %s", *subnet.ID)
 
 	publicIP, err := createPublicIP(ctx)
 	if err != nil {
-		log.Fatalf("cannot create public IP address:%+v", err)
+		log.Fatal("cannot create public IP address:%+v", err)
 	}
-	log.Printf("Created public IP address: %s", *publicIP.ID)
+	log.Info("Created public IP address: %s", *publicIP.ID)
 
 	// network security group
 	nsg, err := createNetworkSecurityGroup(ctx)
 	if err != nil {
-		log.Fatalf("cannot create network security group:%+v", err)
+		log.Fatal("cannot create network security group:%+v", err)
 	}
-	log.Printf("Created network security group: %s", *nsg.ID)
+	log.Info("Created network security group: %s", *nsg.ID)
 
 	netWorkInterface, err := createNetWorkInterface(ctx, *subnet.ID, *publicIP.ID, *nsg.ID)
 	if err != nil {
-		log.Fatalf("cannot create network interface:%+v", err)
+		log.Fatal("cannot create network interface:%+v", err)
 	}
-	log.Printf("Created network interface: %s", *netWorkInterface.ID)
+	log.Info("Created network interface: %s", *netWorkInterface.ID)
 
 	networkInterfaceID := netWorkInterface.ID
 	virtualMachine, err := createVirtualMachine(ctx, *networkInterfaceID)
 	if err != nil {
-		log.Fatalf("cannot create virual machine:%+v", err)
+		log.Fatal("cannot create virual machine:%+v", err)
 	}
-	log.Printf("Created network virual machine: %s", *virtualMachine.ID)
+	log.Info("Created network virual machine: %s", *virtualMachine.ID)
 
-	log.Println("Virtual machine created successfully")
+	log.Info("Virtual machine created successfully!")
 
 	return publicIP
 }
@@ -136,62 +136,62 @@ func createVM() *armnetwork.PublicIPAddress {
 func cleanup() {
 	ctx := context.Background()
 
-	log.Println("start deleting virtual machine...")
+	log.Info("start deleting virtual machine...")
 	err := deleteVirtualMachine(ctx)
 	if err != nil {
-		log.Fatalf("cannot delete virtual machine:%+v", err)
+		log.Fatal("cannot delete virtual machine:%+v", err)
 	}
-	log.Println("deleted virtual machine")
+	log.Info("deleted virtual machine")
 
 	err = deleteDisk(ctx)
 	if err != nil {
-		log.Fatalf("cannot delete disk:%+v", err)
+		log.Fatal("cannot delete disk:%+v", err)
 	}
-	log.Println("deleted disk")
+	log.Info("deleted disk")
 
 	err = deleteNetWorkInterface(ctx)
 	if err != nil {
-		log.Fatalf("cannot delete network interface:%+v", err)
+		log.Fatal("cannot delete network interface:%+v", err)
 	}
-	log.Println("deleted network interface")
+	log.Info("deleted network interface")
 
 	err = deleteNetworkSecurityGroup(ctx)
 	if err != nil {
-		log.Fatalf("cannot delete network security group:%+v", err)
+		log.Fatal("cannot delete network security group:%+v", err)
 	}
-	log.Println("deleted network security group")
+	log.Info("deleted network security group")
 
 	err = deletePublicIP(ctx)
 	if err != nil {
-		log.Fatalf("cannot delete public IP address:%+v", err)
+		log.Fatal("cannot delete public IP address:%+v", err)
 	}
-	log.Println("deleted public IP address")
+	log.Info("deleted public IP address")
 
 	err = deleteSubnets(ctx)
 	if err != nil {
-		log.Fatalf("cannot delete subnet:%+v", err)
+		log.Fatal("cannot delete subnet:%+v", err)
 	}
-	log.Println("deleted subnet")
+	log.Info("deleted subnet")
 
 	err = deleteVirtualNetWork(ctx)
 	if err != nil {
-		log.Fatalf("cannot delete virtual network:%+v", err)
+		log.Fatal("cannot delete virtual network:%+v", err)
 	}
-	log.Println("deleted virtual network")
+	log.Info("deleted virtual network")
 
 	err = deleteResourceGroup(ctx)
 	if err != nil {
-		log.Fatalf("cannot delete resource group:%+v", err)
+		log.Fatal("cannot delete resource group:%+v", err)
 	}
-	log.Println("deleted resource group")
-	log.Println("success deleted virtual machine.")
+	log.Info("deleted resource group")
+	log.Info("success deleted virtual machine.")
 }
 
 func connectionAzure() (azcore.TokenCredential, error) {
 	// Load environment variables from .env file
 	err := godotenv.Load()
 	if err != nil {
-		log.Printf("Error loading .env file: %v", err)
+		log.Fatal("Error loading .env file", err)
 	}
 
 	// Retrieve Azure credentials from environment variables

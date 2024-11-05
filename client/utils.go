@@ -71,6 +71,9 @@ func copyFile(ctx *SSHContext, src, dst string) error {
 	} else {
 		// src is remote
 		file, err := os.Create(dst)
+		if err != nil {
+			return fmt.Errorf("failed to create file for copying: %v", err)
+		}
 		err = client.CopyFromRemote(context.Background(), file, src) // copy from remote to local
 		if err != nil {
 			return fmt.Errorf("failed to copy file: %v", err)
@@ -107,12 +110,21 @@ func setupServer(ctx *SSHContext) error {
 
 	// Copy the host public key to the remote server
 	err = copyFile(ctx, config.HostPublicKeyFile, config.HostPublicKeyFile)
+	if err != nil {
+		return fmt.Errorf("failed to copy host public key: %v", err)
+	}
 
 	// Copy shellscript to the remote server
 	err = copyFile(ctx, config.SetupScriptFile, config.SetupScriptFile)
+	if err != nil {
+		return fmt.Errorf("failed to copy setup script: %v", err)
+	}
 
 	// Execute the shellscript on the remote server in background
 	err = executeCommand(ctx, "chmod +x "+config.SetupScriptFile+" "+"&& ./"+config.SetupScriptFile+" &")
+	if err != nil {
+		return fmt.Errorf("failed to execute setup script: %v", err)
+	}
 
 	return nil
 }

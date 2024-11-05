@@ -2,185 +2,111 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 
-	"github.com/pion/webrtc/v3"
+	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
 )
 
-// Config struct to hold configurable constants and parameters
-type Config struct {
-	RTMPServerURL       string
-	ServerPublicKeyFile string
-	// HostPrivateKeyFile string // unused
-	HostPublicKeyFile string
-	SSHPort           int
-	SSHUsername       string
-	SSHPrivateKeyPath string
-	SSHPublicKeyPath  string
-	PrivateKeyPath    string
-	MaxSSHRetries     int
-	FilePermissions   os.FileMode
-	SetupScriptFile   string
+var docStyle = lipgloss.NewStyle().Margin(1, 2)
+
+type viewState int
+
+type item struct {
+	title, desc string
 }
 
-// InitializeConfig creates and returns the global configuration instance
-func InitializeConfig() Config {
-	return Config{
-		RTMPServerURL:       "rtmp://localhost:1935/live/",
-		ServerPublicKeyFile: "serverPublicKey.bin",
-		// HostPrivateKeyFile: "hostPrivateKey.bin", // unused
-		HostPublicKeyFile: "hostPublicKey.bin",
-		SSHPort:           22,
-		SSHUsername:       "overlord",
-		SSHPrivateKeyPath: "id_rsa",
-		SSHPublicKeyPath:  "id_rsa.pub",
-		MaxSSHRetries:     10,
-		FilePermissions:   0666,
-		SetupScriptFile:   "setup.sh",
-	}
+func (i item) Title() string       { return i.title }
+func (i item) Description() string { return i.desc }
+func (i item) FilterValue() string { return i.title }
+
+var azureLocations = []list.Item{
+	item{title: "centralus", desc: "Chicago"},
+	item{title: "westcentralus", desc: "Wyoming"},
+	item{title: "westus2", desc: "Oregon"},
+	item{title: "westus", desc: "Los Angeles"},
+	item{title: "westus3", desc: "Arizona"},
+	item{title: "southcentralus", desc: "Texas"},
+	item{title: "canadacentral", desc: "Maine"},
+	item{title: "eastus", desc: "NYC"},
 }
 
-// Global configuration instance
-var config Config
+const (
+	initialView viewState = iota
+	logView
+)
 
-func init() {
-	config = InitializeConfig()
+type model struct {
+	state viewState
+	log   *log.Logger
+	list  list.Model
 }
 
-// TODO: make the printing prettier
-func main() {
-	// Channel for RTMP data
-	rtmpData := make(chan []byte)
-	fmt.Println("Starting RTMP server")
+func (m *model) switchToLogView() tea.Cmd {
+	m.state = logView
+	return nil
+}
 
-	// Start RTMP server asynchronously
-	resultCh := startRTMPServer(rtmpData)
+func (m *model) Init() tea.Cmd {
+	return nil
+}
 
-	// Process the result asynchronously
-	go func() {
-		result := <-resultCh
-		if result.err != nil {
-			fmt.Println("Error starting RTMP server:", result.err)
-		} else {
-			fmt.Println("RTMP server started with URL:", result.url)
-		}
-	}()
-
-	// Generate a key pair for the host
-	fmt.Println("Generating public/private keys on host")
-	hostPublicKey, hostPrivateKey, err := generateDHKeyPair()
-	if err != nil {
-		fmt.Println("Error generating public/private keys on host")
-		panic(err)
-	}
-
-	// Write the host public key to a file
-	fmt.Println("Have host public key, writing to file")
-	err = os.WriteFile(config.HostPublicKeyFile, hostPublicKey, config.FilePermissions)
-	if err != nil {
-		fmt.Println("Error writing host public key to file")
-		panic(err)
-	}
-	defer os.Remove(config.HostPublicKeyFile)
-
-	// Allocate a VM
-	fmt.Println("Allocating VM")
-	publicIP := allocateVM()
-	if *publicIP.Properties.IPAddress == "" {
-		panic("Error allocating VM")
-	}
-
-	//generate ssh keypair
-	fmt.Println("Generating SSH keypair")
-	err = generateSSHKey()
-
-	// Connect to the VM
-	fmt.Println("Connecting to VM via SSH")
-	ctxSSH := &SSHContext{
-		Host:           *publicIP.Properties.IPAddress,
-		Port:           config.SSHPort,
-		Username:       config.SSHUsername,
-		PrivateKeyPath: config.PrivateKeyPath,
-		SSHClient:      nil,
-	}
-
-	var retry int = 0
-	for {
-		ctxSSH.SSHClient, err = connectSSH(ctxSSH)
-		if err != nil {
-			if retry < config.MaxSSHRetries {
-				fmt.Println("Error connecting to VM via SSH, retrying")
-				retry++
-				continue
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "enter":
+			if m.state == initialView {
+				location = azureLocations[m.list.Cursor()].(item).title
+				go background_main()
+				return m, m.switchToLogView()
 			}
-			fmt.Println("Error connecting to VM via SSH")
-			panic(err)
+			// case "t":
+			// 	log.Debug("t pressed")
 		}
-		break
+	case tea.WindowSizeMsg:
+		h, v := docStyle.GetFrameSize()
+		m.list.SetSize(msg.Width-h, msg.Height-v)
 	}
 
-	// setup server
-	fmt.Println("Setting up server")
-	err = setupServer(ctxSSH)
-	if err != nil {
-		fmt.Println("Error setting up server")
-		panic(err)
+	var cmd tea.Cmd
+	if m.state == initialView {
+		m.list, cmd = m.list.Update(msg)
 	}
+	return m, cmd
+}
 
-	// Get the server's public key
-	fmt.Println("Getting server public key")
-	err = getServerPublicKey(ctxSSH)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
+func (m *model) View() string {
+	switch m.state {
+	case initialView:
+		return docStyle.Render(m.list.View())
+	case logView:
+		// clear the screen
+		fmt.Print("\033[H\033[2J")
+		return docStyle.Render() // This works, trust me
+	default:
+		return ""
 	}
+}
 
-	// Compute the shared secret
-	fmt.Println("Computing shared secret")
-	serverPublicKey, err := os.ReadFile(config.ServerPublicKeyFile)
-	sharedSecret, err := computeSharedSecret(hostPrivateKey, serverPublicKey)
-	if err != nil {
-		fmt.Println("Error computing shared secret")
-		panic(err)
+func main() {
+	log.SetLevel(log.DebugLevel)
+	log.SetReportCaller(true)
+
+	m := model{
+		state: initialView,
+		log:   log.Default(),
+		list:  list.New(azureLocations, list.NewDefaultDelegate(), 0, 0),
 	}
+	m.list.Title = "Azure Locations"
 
-	// Derive the encryption key
-	fmt.Println("Deriving encryption key")
-	encryptionKey, err := deriveEncryptionKey(sharedSecret)
-	if err != nil {
-		fmt.Println("Error deriving encryption key")
-		panic(err)
+	p := tea.NewProgram(&m)
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error: %v", err)
+		os.Exit(1)
 	}
-
-	// Create a WebRTC peer connection
-	fmt.Println("Establishing WebRTC connection")
-	peerConnection, err := createPeerConnection()
-	if err != nil {
-		fmt.Println("Error creating peer connection")
-		panic(err)
-	}
-
-	// Handle WebRTC signaling
-	fmt.Println("Starting encrypted WebRTC signaling")
-	conn, err := net.Dial("tcp", *publicIP.Properties.IPAddress+":9001")
-	if err != nil {
-		fmt.Println("Error connecting to server:", err)
-		panic(err)
-	}
-	defer conn.Close()
-	handleWebRTCSignaling(conn, encryptionKey, peerConnection)
-
-	// Send the local camera feed
-	fmt.Println("Sending camera feed")
-	if err := sendLocalCamera(peerConnection); err != nil {
-		fmt.Println("Error sending local camera")
-		panic(err)
-	}
-
-	// Handle incoming tracks
-	fmt.Println("Waiting for deepfake video")
-	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		go handleIncomingTrack(track, rtmpData)
-	})
 }

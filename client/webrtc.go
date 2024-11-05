@@ -3,11 +3,10 @@ package main
 import (
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net"
 
-	"github.com/pion/rtp"
+	"github.com/charmbracelet/log"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"gocv.io/x/gocv"
@@ -27,7 +26,7 @@ func createPeerConnection() (*webrtc.PeerConnection, error) {
 }
 
 func sendLocalCamera(peerConnection *webrtc.PeerConnection) error {
-	webcam, err := gocv.OpenVideoCapture(0) // Adjust camera index as needed
+	webcam, err := gocv.OpenVideoCapture(config.CameraIndex) // Adjust camera index as needed
 	if err != nil {
 		return err
 	}
@@ -54,7 +53,7 @@ func sendLocalCamera(peerConnection *webrtc.PeerConnection) error {
 			// Encode frame to RTP packet
 			sample, err := encodeFrameToSample(img)
 			if err != nil {
-				fmt.Println("Error encoding frame:", err)
+				log.Fatal("Error encoding frame:", err)
 				break
 			}
 			videoTrack.WriteSample(sample)
@@ -63,16 +62,16 @@ func sendLocalCamera(peerConnection *webrtc.PeerConnection) error {
 	return nil
 }
 
-func decodeRTPPacketToFrame(packet rtp.Packet) (gocv.Mat, error) {
-	img, err := gocv.IMDecode(packet.Payload, gocv.IMReadColor)
-	if err != nil {
-		return gocv.Mat{}, err
-	}
-	return img, nil
-}
+// func decodeRTPPacketToFrame(packet rtp.Packet) (gocv.Mat, error) {
+// 	img, err := gocv.IMDecode(packet.Payload, gocv.IMReadColor)
+// 	if err != nil {
+// 		return gocv.Mat{}, err
+// 	}
+// 	return img, nil
+// }
 
 func encodeFrameToSample(img gocv.Mat) (media.Sample, error) {
-	encodedFrame, err := gocv.IMEncode(".jpg", img)
+	encodedFrame, err := gocv.IMEncode(".png", img)
 	if err != nil {
 		return media.Sample{}, err
 	}
@@ -91,19 +90,19 @@ func handleIncomingTrack(track *webrtc.TrackRemote, data chan<- []byte) {
 	for {
 		packet, _, err := track.ReadRTP()
 		if err != nil {
-			fmt.Println("Error reading RTP packet:", err)
+			log.Fatal("Error reading RTP packet:", err)
 			break
 		}
 
 		frame, err := packet.Marshal()
 		if err != nil {
-			fmt.Println("Error marshalling packet:", err)
+			log.Fatal("Error marshalling packet:", err)
 			break
 		}
 
 		img, err = gocv.IMDecode(frame, gocv.IMReadColor)
 		if err != nil {
-			fmt.Println("Error decoding frame:", err)
+			log.Fatal("Error decoding frame:", err)
 			break
 		}
 
@@ -117,14 +116,14 @@ func handleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *
 	// Create an offer
 	offer, err := peerConnection.CreateOffer(nil)
 	if err != nil {
-		fmt.Println("Error creating offer:", err)
+		log.Fatal("Error creating offer:", err)
 		return
 	}
 
 	// Set the local description
 	err = peerConnection.SetLocalDescription(offer)
 	if err != nil {
-		fmt.Println("Error setting local description:", err)
+		log.Fatal("Error setting local description:", err)
 		return
 	}
 
@@ -138,14 +137,14 @@ func handleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *
 	// Convert the local description to JSON
 	localDescJSON, err := json.Marshal(localDesc)
 	if err != nil {
-		fmt.Println("Error marshalling local description to JSON:", err)
+		log.Fatal("Error marshalling local description to JSON:", err)
 		return
 	}
 
 	// Encrypt the local description
 	encryptedLocalDesc, err := encryptMessage(encryptionKey, localDescJSON)
 	if err != nil {
-		fmt.Println("Error encrypting local description:", err)
+		log.Fatal("Error encrypting local description:", err)
 		return
 	}
 
@@ -158,13 +157,13 @@ func handleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *
 	// Send length and encrypted message
 	_, err = conn.Write(lenBytes)
 	if err != nil {
-		fmt.Println("Error sending message length:", err)
+		log.Fatal("Error sending message length:", err)
 		return
 	}
 
 	_, err = conn.Write(encryptedLocalDesc)
 	if err != nil {
-		fmt.Println("Error sending encrypted local description:", err)
+		log.Fatal("Error sending encrypted local description:", err)
 		return
 	}
 
@@ -172,7 +171,7 @@ func handleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *
 	// First, read the length
 	_, err = io.ReadFull(conn, lenBytes)
 	if err != nil {
-		fmt.Println("Error reading message length:", err)
+		log.Fatal("Error reading message length:", err)
 		return
 	}
 
@@ -180,14 +179,14 @@ func handleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *
 	encryptedRemoteDesc := make([]byte, msgLen)
 	_, err = io.ReadFull(conn, encryptedRemoteDesc)
 	if err != nil {
-		fmt.Println("Error reading encrypted remote description:", err)
+		log.Fatal("Error reading encrypted remote description:", err)
 		return
 	}
 
 	// Decrypt the remote description
 	remoteDescJSON, err := decryptMessage(encryptionKey, encryptedRemoteDesc)
 	if err != nil {
-		fmt.Println("Error decrypting remote description:", err)
+		log.Fatal("Error decrypting remote description:", err)
 		return
 	}
 
@@ -195,14 +194,14 @@ func handleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *
 	var remoteDesc webrtc.SessionDescription
 	err = json.Unmarshal(remoteDescJSON, &remoteDesc)
 	if err != nil {
-		fmt.Println("Error unmarshalling remote description:", err)
+		log.Fatal("Error unmarshalling remote description:", err)
 		return
 	}
 
 	// Set the remote description
 	err = peerConnection.SetRemoteDescription(remoteDesc)
 	if err != nil {
-		fmt.Println("Error setting remote description:", err)
+		log.Fatal("Error setting remote description:", err)
 		return
 	}
 }

@@ -23,6 +23,8 @@ type Config struct {
 	FilePermissions   os.FileMode
 	SetupScriptFile   string
 	CameraIndex       int
+	ServerBinaryPath  string
+	DataDir           string
 }
 
 // InitializeConfig creates and returns the global configuration instance
@@ -40,6 +42,8 @@ func InitializeConfig() Config {
 		FilePermissions:   0666,
 		SetupScriptFile:   "setup.sh",
 		CameraIndex:       0,
+		ServerBinaryPath:  "server",
+		DataDir:           "data",
 	}
 }
 

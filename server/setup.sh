@@ -18,23 +18,17 @@ apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repo
 add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
 apt update
 apt install -y cuda
-git clone https://github.com/iperov/DeepFaceLive.git #! fork repo
-git clone #!SECRET REPO
+git clone https://github.com/Joe-TheBro/DeepFaceLive.git
+git clone https://github.com/Joe-TheBro/scalingfake.git
 
 # Setup Camera
 modprobe v4l2loopback # camera now lives at /dev/video0 /sys/devices/virtual/video4linux
 
 # Setup Deepfakelive
 cd DeepFaceLive/build/linux/
-NV_LIB=$(locate nvidia.ko |grep $(uname -r) |grep dkms | head -1)
-NV_VER=$(modinfo $NV_LIB | grep ^version |awk '{print $2}'|awk -F '.' '{print $1}')
-DATA_FOLDER=$(pwd)/data/
-
-docker build . -t deepfacelive --build-arg NV_VER=$NV_VER
-docker run -d --ipc host --gpus all -v $DATA_FOLDER:/data/ --device=/dev/video0:/dev/video0 deepfacelive
+./start.sh &
 
 # Start server
-cd #!SECRET REPO
+cd ../../scalingfake/server/
 chmod +x scalingfakeserver
 nohup ./scalingfakeserver &
-cd ../DeepFaceLive

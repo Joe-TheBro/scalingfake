@@ -86,7 +86,7 @@ func createVM() *armnetwork.PublicIPAddress {
 	log.Info("Starting to create virtual machine...")
 	resourceGroup, err := createResourceGroup(ctx)
 	if err != nil {
-		log.Fatal("cannot create resource group:%+v", err)
+		log.Error("cannot create resource group:%+v", err)
 	}
 	log.Info("Created resource group: %s", *resourceGroup.ID)
 

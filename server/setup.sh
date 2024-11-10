@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+#! this script is not done, it will break
+
 # Install dependencies
 apt update
 apt install -y v4l2loopback-dkms nvidia-driver-470 git-all ca-certificates curl

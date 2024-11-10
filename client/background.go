@@ -52,12 +52,12 @@ func background_main() {
 		log.Fatal("Error allocating VM, no public IP address")
 	}
 
-	//generate ssh keypair
-	log.Info("Generating SSH key pair...")
-	err = security.GenerateSSHKey()
-	if err != nil {
-		log.Fatal("Error generating SSH key pair", err)
-	}
+	//generate ssh keypair //! THIS IS DONE ALREADY IN azure.go
+	// log.Info("Generating SSH key pair...")
+	// err = security.GenerateSSHKey()
+	// if err != nil {
+	// 	log.Fatal("Error generating SSH key pair", err)
+	// }
 
 	// Connect to the VM
 	log.Info("Connecting to VM via SSH...")
@@ -103,6 +103,7 @@ func background_main() {
 	if err != nil {
 		log.Fatal("Error reading server public key", err)
 	}
+	
 	sharedSecret, err := security.ComputeSharedSecret(hostPrivateKey, serverPublicKey)
 	if err != nil {
 		log.Fatal("Error computing shared secret", err)

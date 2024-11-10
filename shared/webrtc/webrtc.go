@@ -207,3 +207,38 @@ func HandleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *
 		return
 	}
 }
+
+func ReceiveEncryptedMessage(conn net.Conn, encryptionKey []byte) (webrtc.SessionDescription, error) {
+	// Read the message length
+	lenBytes := make([]byte, 4)
+	_, err := io.ReadFull(conn, lenBytes)
+	if err != nil {
+		log.Warn("Error reading message length:", err)
+		return webrtc.SessionDescription{}, err
+	}
+
+	msgLen := binary.BigEndian.Uint32(lenBytes)
+	encryptedMessage := make([]byte, msgLen)
+	_, err = io.ReadFull(conn, encryptedMessage)
+	if err != nil {
+		log.Warn("Error reading encrypted message:", err)
+		return webrtc.SessionDescription{}, err
+	}
+
+	// Decrypt the message
+	message, err := security.DecryptMessage(encryptionKey, encryptedMessage)
+	if err != nil {
+		log.Warn("Error decrypting message:", err)
+		return webrtc.SessionDescription{}, err
+	}
+
+	// Unmarshal the message
+	var desc webrtc.SessionDescription
+	err = json.Unmarshal(message, &desc)
+	if err != nil {
+		log.Warn("Error unmarshalling message:", err)
+		return webrtc.SessionDescription{}, err
+	}
+	// Send the decrypted message 
+	return desc, nil
+}

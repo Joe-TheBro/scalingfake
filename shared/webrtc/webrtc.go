@@ -64,14 +64,6 @@ func SendLocalCamera(peerConnection *webrtc.PeerConnection) error {
 	return nil
 }
 
-// func decodeRTPPacketToFrame(packet rtp.Packet) (gocv.Mat, error) {
-// 	img, err := gocv.IMDecode(packet.Payload, gocv.IMReadColor)
-// 	if err != nil {
-// 		return gocv.Mat{}, err
-// 	}
-// 	return img, nil
-// }
-
 func EncodeFrameToSample(img gocv.Mat) (media.Sample, error) {
 	encodedFrame, err := gocv.IMEncode(".png", img)
 	if err != nil {

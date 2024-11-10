@@ -11,6 +11,8 @@ import (
 	"github.com/Joe-TheBro/scalingfake/shared/webrtc"
 	"github.com/charmbracelet/log"
 	pionWebRTC "github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v3/pkg/media"
+	"gocv.io/x/gocv"
 )
 
 func serverLocalDescription(conn net.Conn, encryptionKey []byte, peerConnection *pionWebRTC.PeerConnection) {
@@ -90,7 +92,60 @@ func listenForHostLocalDescription(peerConnection *pionWebRTC.PeerConnection, en
 
 func serverIncomingTrack(track *pionWebRTC.TrackRemote, receiver *pionWebRTC.RTPReceiver) {
 	for {
-		//IMPLEMENT
+		// Incoming packets are h264 NewTrackLocalStaticSample packets
+		videoDevice, err := gocv.VideoWriterFile("/dev/video0", "MJPG", 60, 1920, 1080, true)
+		if err != nil {
+			log.Fatal("Error opening video device:", err)
+		}
+		defer videoDevice.Close()
+
+		for {
+			packet, _, err := track.ReadRTP()
+			if err != nil {
+				log.Warn("Error reading RTP packet:", err)
+				break
+			}
+
+			// decode into image
+			img, err := gocv.IMDecode(packet.Payload, gocv.IMReadColor)
+			if err != nil {
+				log.Warn("Error decoding image:", err)
+				break
+			}
+			defer img.Close()
+
+			// write to video device
+			videoDevice.Write(img)
+		}
+	}
+}
+
+func mpegtsToTrack(track *pionWebRTC.TrackLocalStaticSample) {
+	// MPEG-TS stream at 127.0.0.1:1234
+	stream, err := gocv.OpenVideoCapture("udp://127.0.0.1:1234")
+	if err != nil {
+		log.Fatal("Error opening video stream:", err)
+	}
+	defer stream.Close()
+
+	img := gocv.NewMat()
+	defer img.Close()
+
+	for {
+		stream.Read(&img)
+		if img.Empty() {
+			continue
+		}
+
+		// encode image
+		buf, err := gocv.IMEncode(".jpg", img)
+		if err != nil {
+			log.Warn("Error encoding image:", err)
+			continue
+		}
+
+		// write to track
+		track.WriteSample(media.Sample{Data: buf.GetBytes()})
 	}
 }
 
@@ -143,4 +198,22 @@ func main() {
 	peerConnection.OnTrack(func(track *pionWebRTC.TrackRemote, receiver *pionWebRTC.RTPReceiver) {
 		go serverIncomingTrack(track, receiver)
 	})
+
+	// Create an outgoing track
+	log.Info("Creating outgoing track")
+	track, err := pionWebRTC.NewTrackLocalStaticSample(pionWebRTC.RTPCodecCapability{MimeType: "video/h264"}, "video", "pion")
+	if err != nil {
+		log.Fatal("Error creating outgoing track:", err)
+	}
+
+	// Add the outgoing track to the peer connection
+	_, err = peerConnection.AddTrack(track)
+	if err != nil {
+		log.Fatal("Error adding outgoing track to peer connection:", err)
+	}
+
+	go mpegtsToTrack(track)
+
+	// Block forever
+	select {}
 }

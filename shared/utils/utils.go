@@ -1,10 +1,11 @@
-package main
+package utils
 
 import (
 	"context"
 	"fmt"
 	"os"
 
+	"github.com/Joe-TheBro/scalingfake/shared/config"
 	"github.com/bramvdbogaerde/go-scp"
 	"github.com/charmbracelet/log"
 	"golang.org/x/crypto/ssh"
@@ -20,7 +21,7 @@ type SSHContext struct {
 
 // Function that generates a SSH client connectSSH()
 // I'll need a context that provides the host, port, and key files
-func connectSSH(ctx *SSHContext) (*ssh.Client, error) {
+func ConnectSSH(ctx *SSHContext) (*ssh.Client, error) {
 	privateKey, err := os.ReadFile(ctx.PrivateKeyPath)
 	if err != nil {
 		log.Fatal("Error reading private key file", err)
@@ -47,8 +48,8 @@ func connectSSH(ctx *SSHContext) (*ssh.Client, error) {
 	return client, nil
 }
 
-// SCP function that can send/receive files copyFile()
-func copyFile(ctx *SSHContext, src, dst string) error {
+// SCP function that can send/receive files CopyFile()
+func CopyFile(ctx *SSHContext, src, dst string) error {
 	sshClient := ctx.SSHClient
 
 	client, err := scp.NewClientBySSH(sshClient)
@@ -85,7 +86,7 @@ func copyFile(ctx *SSHContext, src, dst string) error {
 }
 
 // SSH function that will execute a command on the remote server executeCommand()
-func executeCommand(ctx *SSHContext, command string) error {
+func ExecuteCommand(ctx *SSHContext, command string) error {
 	sshClient := ctx.SSHClient
 
 	session, err := sshClient.NewSession()
@@ -102,33 +103,33 @@ func executeCommand(ctx *SSHContext, command string) error {
 	return nil
 }
 
-func setupServer(ctx *SSHContext) error {
+func SetupServer(ctx *SSHContext) error {
 	// Copy the server binary to the remote server
-	err := copyFile(ctx, config.ServerBinaryPath, config.ServerBinaryPath)
+	err := CopyFile(ctx, config.ServerBinaryPath, config.ServerBinaryPath)
 	if err != nil {
 		log.Fatal("failed to copy server binary: %v", err)
 	}
 
 	// Copy the host public key to the remote server
-	err = copyFile(ctx, config.HostPublicKeyFile, config.HostPublicKeyFile)
+	err = CopyFile(ctx, config.HostPublicKeyFile, config.HostPublicKeyFile)
 	if err != nil {
 		log.Fatal("failed to copy host public key: %v", err)
 	}
 
 	// Copy shellscript to the remote server
-	err = copyFile(ctx, config.SetupScriptFile, config.SetupScriptFile)
+	err = CopyFile(ctx, config.SetupScriptFile, config.SetupScriptFile)
 	if err != nil {
 		log.Fatal("failed to copy setup script: %v", err)
 	}
 
 	//copy data directory to server
-	err = copyFile(ctx, config.DataDir, config.DataDir)
+	err = CopyFile(ctx, config.DataDir, config.DataDir)
 	if err != nil {
 		log.Fatal("failed to copy data directory: %v", err)
 	}
 
 	// Execute the shellscript on the remote server in background
-	err = executeCommand(ctx, "chmod +x "+config.SetupScriptFile+" "+"&& ./"+config.SetupScriptFile+" &")
+	err = ExecuteCommand(ctx, "chmod +x "+config.SetupScriptFile+" "+"&& ./"+config.SetupScriptFile+" &")
 	if err != nil {
 		log.Fatal("failed to execute setup script: %v", err)
 	}

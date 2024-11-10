@@ -1,4 +1,4 @@
-package main
+package security
 
 import (
 	"crypto/aes"
@@ -12,13 +12,15 @@ import (
 	"io"
 	"os"
 
+	"github.com/Joe-TheBro/scalingfake/shared/config"
+	"github.com/Joe-TheBro/scalingfake/shared/utils"
 	"github.com/charmbracelet/log"
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/ssh"
 )
 
-func generateDHKeyPair() ([]byte, []byte, error) {
+func GenerateDHKeyPair() ([]byte, []byte, error) {
 	privateKey := make([]byte, 32)
 	_, err := rand.Read(privateKey)
 	if err != nil {
@@ -31,7 +33,7 @@ func generateDHKeyPair() ([]byte, []byte, error) {
 	return privateKey, publicKey, nil
 }
 
-func computeSharedSecret(privateKey, peerPublicKey []byte) ([]byte, error) {
+func ComputeSharedSecret(privateKey, peerPublicKey []byte) ([]byte, error) {
 	sharedSecret, err := curve25519.X25519(privateKey, peerPublicKey)
 	if err != nil {
 		return nil, err
@@ -39,7 +41,7 @@ func computeSharedSecret(privateKey, peerPublicKey []byte) ([]byte, error) {
 	return sharedSecret, nil
 }
 
-func deriveEncryptionKey(sharedSecret []byte) ([]byte, error) {
+func DeriveEncryptionKey(sharedSecret []byte) ([]byte, error) {
 	hash := sha512.New
 	hkdf := hkdf.New(hash, sharedSecret, nil, nil)
 	key := make([]byte, 32) // 512-bit key for AES-384, documentation is unclear on whether importing 512 is actually 384
@@ -49,7 +51,7 @@ func deriveEncryptionKey(sharedSecret []byte) ([]byte, error) {
 	return key, nil
 }
 
-func encryptMessage(key, plaintext []byte) ([]byte, error) {
+func EncryptMessage(key, plaintext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -66,7 +68,7 @@ func encryptMessage(key, plaintext []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-func decryptMessage(key, ciphertext []byte) ([]byte, error) {
+func DecryptMessage(key, ciphertext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -84,13 +86,13 @@ func decryptMessage(key, ciphertext []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-func getServerPublicKey(ctx *SSHContext) error {
-	copyFile(ctx, config.ServerPublicKeyFile, config.ServerPublicKeyFile)
+func GetServerPublicKey(ctx *utils.SSHContext) error {
+	utils.CopyFile(ctx, config.ServerPublicKeyFile, config.ServerPublicKeyFile)
 	log.Info("Received server public key")
 	return nil
 }
 
-func generateSSHKey() error {
+func GenerateSSHKey() error {
 	// open private and public key files
 	privateKeyFile, err := os.Create(config.SSHPrivateKeyPath)
 	if err != nil {

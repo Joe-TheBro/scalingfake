@@ -1,4 +1,4 @@
-package main
+package webrtc
 
 import (
 	"encoding/binary"
@@ -6,13 +6,15 @@ import (
 	"io"
 	"net"
 
+	"github.com/Joe-TheBro/scalingfake/shared/config"
+	"github.com/Joe-TheBro/scalingfake/shared/security"
 	"github.com/charmbracelet/log"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"gocv.io/x/gocv"
 )
 
-func createPeerConnection() (*webrtc.PeerConnection, error) {
+func CreatePeerConnection() (*webrtc.PeerConnection, error) {
 	mediaEngine := &webrtc.MediaEngine{}
 	if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
 		return nil, err
@@ -25,7 +27,7 @@ func createPeerConnection() (*webrtc.PeerConnection, error) {
 	return peerConnection, nil
 }
 
-func sendLocalCamera(peerConnection *webrtc.PeerConnection) error {
+func SendLocalCamera(peerConnection *webrtc.PeerConnection) error {
 	webcam, err := gocv.OpenVideoCapture(config.CameraIndex) // Adjust camera index as needed
 	if err != nil {
 		return err
@@ -51,7 +53,7 @@ func sendLocalCamera(peerConnection *webrtc.PeerConnection) error {
 				break
 			}
 			// Encode frame to RTP packet
-			sample, err := encodeFrameToSample(img)
+			sample, err := EncodeFrameToSample(img)
 			if err != nil {
 				log.Fatal("Error encoding frame:", err)
 				break
@@ -70,7 +72,7 @@ func sendLocalCamera(peerConnection *webrtc.PeerConnection) error {
 // 	return img, nil
 // }
 
-func encodeFrameToSample(img gocv.Mat) (media.Sample, error) {
+func EncodeFrameToSample(img gocv.Mat) (media.Sample, error) {
 	encodedFrame, err := gocv.IMEncode(".png", img)
 	if err != nil {
 		return media.Sample{}, err
@@ -82,7 +84,7 @@ func encodeFrameToSample(img gocv.Mat) (media.Sample, error) {
 }
 
 // handleIncomingTrack sends the decoded image bytes to a channel
-func handleIncomingTrack(track *webrtc.TrackRemote, data chan<- []byte) {
+func HandleIncomingTrack(track *webrtc.TrackRemote, data chan<- []byte) {
 	defer close(data) // Ensure the channel is closed when done
 	img := gocv.NewMat()
 	defer img.Close()
@@ -112,7 +114,7 @@ func handleIncomingTrack(track *webrtc.TrackRemote, data chan<- []byte) {
 	}
 }
 
-func handleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *webrtc.PeerConnection) {
+func HandleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *webrtc.PeerConnection) {
 	// Create an offer
 	offer, err := peerConnection.CreateOffer(nil)
 	if err != nil {
@@ -142,7 +144,7 @@ func handleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *
 	}
 
 	// Encrypt the local description
-	encryptedLocalDesc, err := encryptMessage(encryptionKey, localDescJSON)
+	encryptedLocalDesc, err := security.EncryptMessage(encryptionKey, localDescJSON)
 	if err != nil {
 		log.Fatal("Error encrypting local description:", err)
 		return
@@ -184,7 +186,7 @@ func handleWebRTCSignaling(conn net.Conn, encryptionKey []byte, peerConnection *
 	}
 
 	// Decrypt the remote description
-	remoteDescJSON, err := decryptMessage(encryptionKey, encryptedRemoteDesc)
+	remoteDescJSON, err := security.DecryptMessage(encryptionKey, encryptedRemoteDesc)
 	if err != nil {
 		log.Fatal("Error decrypting remote description:", err)
 		return

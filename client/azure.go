@@ -11,6 +11,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/Joe-TheBro/scalingfake/shared/config"
+	"github.com/Joe-TheBro/scalingfake/shared/security"
 	"github.com/charmbracelet/log"
 	"github.com/joho/godotenv"
 )
@@ -600,7 +602,7 @@ func deleteNetWorkInterface(ctx context.Context) error {
 
 func createVirtualMachine(ctx context.Context, networkInterfaceID string) (*armcompute.VirtualMachine, error) {
 	//require ssh key for authentication on linux
-	err := generateSSHKey()
+	err := security.GenerateSSHKey()
 	if err != nil {
 		return nil, err
 	}

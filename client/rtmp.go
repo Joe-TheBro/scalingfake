@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 
+	"github.com/Joe-TheBro/scalingfake/shared/config"
 	"github.com/charmbracelet/log"
 )
 

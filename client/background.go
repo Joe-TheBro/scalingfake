@@ -4,55 +4,13 @@ import (
 	"net"
 	"os"
 
+	"github.com/Joe-TheBro/scalingfake/shared/config"
+	"github.com/Joe-TheBro/scalingfake/shared/security"
+	"github.com/Joe-TheBro/scalingfake/shared/utils"
+	"github.com/Joe-TheBro/scalingfake/shared/webrtc"
 	"github.com/charmbracelet/log"
-	"github.com/pion/webrtc/v3"
+	pionWebRTC "github.com/pion/webrtc/v3"
 )
-
-// Config struct to hold configurable constants and parameters
-type Config struct {
-	RTMPServerURL       string
-	ServerPublicKeyFile string
-	// HostPrivateKeyFile string // unused
-	HostPublicKeyFile string
-	SSHPort           int
-	SSHUsername       string
-	SSHPrivateKeyPath string
-	SSHPublicKeyPath  string
-	PrivateKeyPath    string
-	MaxSSHRetries     int
-	FilePermissions   os.FileMode
-	SetupScriptFile   string
-	CameraIndex       int
-	ServerBinaryPath  string
-	DataDir           string
-}
-
-// InitializeConfig creates and returns the global configuration instance
-func InitializeConfig() Config {
-	return Config{
-		RTMPServerURL:       "rtmp://localhost:1935/live/",
-		ServerPublicKeyFile: "serverPublicKey.bin",
-		// HostPrivateKeyFile: "hostPrivateKey.bin", // unused
-		HostPublicKeyFile: "hostPublicKey.bin",
-		SSHPort:           22,
-		SSHUsername:       "overlord",
-		SSHPrivateKeyPath: "id_rsa",
-		SSHPublicKeyPath:  "id_rsa.pub",
-		MaxSSHRetries:     10,
-		FilePermissions:   0666,
-		SetupScriptFile:   "setup.sh",
-		CameraIndex:       0,
-		ServerBinaryPath:  "server",
-		DataDir:           "data",
-	}
-}
-
-// Global configuration instance
-var config Config
-
-func init() {
-	config = InitializeConfig()
-}
 
 func background_main() {
 	// Channel for RTMP data
@@ -74,7 +32,7 @@ func background_main() {
 
 	// Generate a key pair for the host
 	log.Info("Generating public/private keys on host")
-	hostPublicKey, hostPrivateKey, err := generateDHKeyPair()
+	hostPublicKey, hostPrivateKey, err := security.GenerateDHKeyPair()
 	if err != nil {
 		log.Fatal("Error generating public/private keys on host", err)
 	}
@@ -96,24 +54,24 @@ func background_main() {
 
 	//generate ssh keypair
 	log.Info("Generating SSH key pair...")
-	err = generateSSHKey()
+	err = security.GenerateSSHKey()
 	if err != nil {
 		log.Fatal("Error generating SSH key pair", err)
 	}
 
 	// Connect to the VM
 	log.Info("Connecting to VM via SSH...")
-	ctxSSH := &SSHContext{
+	ctxSSH := &utils.SSHContext{
 		Host:           *publicIP.Properties.IPAddress,
 		Port:           config.SSHPort,
 		Username:       config.SSHUsername,
-		PrivateKeyPath: config.PrivateKeyPath,
+		PrivateKeyPath: config.SSHPrivateKeyPath,
 		SSHClient:      nil,
 	}
 
 	var retry int = 0
 	for {
-		ctxSSH.SSHClient, err = connectSSH(ctxSSH)
+		ctxSSH.SSHClient, err = utils.ConnectSSH(ctxSSH)
 		if err != nil {
 			if retry < config.MaxSSHRetries {
 				log.Warn("Error connecting to VM via SSH, retrying")
@@ -127,14 +85,14 @@ func background_main() {
 
 	// setup server
 	log.Info("Setting up server...")
-	err = setupServer(ctxSSH)
+	err = utils.SetupServer(ctxSSH)
 	if err != nil {
 		log.Fatal("Error setting up server...", err)
 	}
 
 	// Get the server's public key
 	log.Info("Getting server public key...")
-	err = getServerPublicKey(ctxSSH) //! Possible race condition
+	err = security.GetServerPublicKey(ctxSSH) //! Possible race condition
 	if err != nil {
 		log.Fatal("Failed retrieving public key...", err)
 	}
@@ -145,21 +103,21 @@ func background_main() {
 	if err != nil {
 		log.Fatal("Error reading server public key", err)
 	}
-	sharedSecret, err := computeSharedSecret(hostPrivateKey, serverPublicKey)
+	sharedSecret, err := security.ComputeSharedSecret(hostPrivateKey, serverPublicKey)
 	if err != nil {
 		log.Fatal("Error computing shared secret", err)
 	}
 
 	// Derive the encryption key
 	log.Info("Deriving encryption key")
-	encryptionKey, err := deriveEncryptionKey(sharedSecret)
+	encryptionKey, err := security.DeriveEncryptionKey(sharedSecret)
 	if err != nil {
 		log.Fatal("Error deriving encryption key", err)
 	}
 
 	// Create a WebRTC peer connection
 	log.Info("Establishing WebRTC connection")
-	peerConnection, err := createPeerConnection()
+	peerConnection, err := webrtc.CreatePeerConnection()
 	if err != nil {
 		log.Fatal("Error creating peer connection", err)
 	}
@@ -171,17 +129,17 @@ func background_main() {
 		log.Fatal("Error connecting to server:", err)
 	}
 	defer conn.Close()
-	handleWebRTCSignaling(conn, encryptionKey, peerConnection)
+	webrtc.HandleWebRTCSignaling(conn, encryptionKey, peerConnection)
 
 	// Send the local camera feed
 	log.Info("Sending camera feed")
-	if err := sendLocalCamera(peerConnection); err != nil {
+	if err := webrtc.SendLocalCamera(peerConnection); err != nil {
 		log.Fatal("Error sending local camera", err)
 	}
 
 	// Handle incoming tracks
 	log.Info("Waiting for deepfake video")
-	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		go handleIncomingTrack(track, rtmpData)
+	peerConnection.OnTrack(func(track *pionWebRTC.TrackRemote, receiver *pionWebRTC.RTPReceiver) {
+		go webrtc.HandleIncomingTrack(track, rtmpData)
 	})
 }

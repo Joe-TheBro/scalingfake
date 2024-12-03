@@ -1,0 +1,4 @@
+Metadata-Version: 2.1
+Name: grubmod
+Version: 0.9.1
+Requires-Dist: click

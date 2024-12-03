@@ -28,10 +28,10 @@ var azureLocations = []list.Item{
 	item{title: "westus2", desc: "Oregon"},
 	item{title: "westus", desc: "Los Angeles"},
 	item{title: "westus3", desc: "Arizona"},
-	item{title: "southcentralus", desc: "Texas"},
+	// item{title: "southcentralus", desc: "Texas"}, region got deprecated
 	item{title: "canadacentral", desc: "Maine"},
-	item{title: "eastus", desc: "NYC"},
-}
+	// item{title: "eastus", desc: "NYC"},
+} //* If you want more go talk to Microsoft Support :)
 
 const (
 	initialView viewState = iota

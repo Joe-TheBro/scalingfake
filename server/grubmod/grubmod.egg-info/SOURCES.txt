@@ -1,0 +1,10 @@
+pyproject.toml
+setup.py
+grubmod/__init__.py
+grubmod/cli.py
+grubmod.egg-info/PKG-INFO
+grubmod.egg-info/SOURCES.txt
+grubmod.egg-info/dependency_links.txt
+grubmod.egg-info/entry_points.txt
+grubmod.egg-info/requires.txt
+grubmod.egg-info/top_level.txt

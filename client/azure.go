@@ -14,7 +14,6 @@ import (
 	"github.com/Joe-TheBro/scalingfake/shared/config"
 	"github.com/Joe-TheBro/scalingfake/shared/security"
 	"github.com/charmbracelet/log"
-	"github.com/joho/godotenv"
 )
 
 // https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal
@@ -191,25 +190,31 @@ func cleanup() {
 
 func connectionAzure() (azcore.TokenCredential, error) {
 	// Load environment variables from .env file
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file", err)
-	}
+	// err := godotenv.Load()
+	// if err != nil {
+	// 	log.Fatal("Error loading .env file", err)
+	// }
 
 	// Retrieve Azure credentials from environment variables
-	subscriptionId = os.Getenv("AZURE_SUBSCRIPTION_ID")
+	// subscriptionId = os.Getenv("AZURE_SUBSCRIPTION_ID")
+	// tenantID := os.Getenv("AZURE_TENANT_ID")
+	// clientID := os.Getenv("AZURE_CLIENT_ID")
+	// clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
 
 	// Ensure all required environment variables are set
-	if subscriptionId == "" {
-		log.Fatal("Azure credentials AZURE_SUBSCRIPTION_ID is not set in .env file.")
-	}
-
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	// if len(subscriptionId) == 0 || len(tenantID) == 0 || len(clientID) == 0 || len(clientSecret) == 0 {
+	// 	log.Fatal("AZURE_TENANT_ID, AZURE_CLIENT_ID, and AZURE_CLIENT_SECRET must be set in the environment variables.")
+	// }
+	// cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, nil)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// return cred, nil
+	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
-		return nil, err
+		log.Fatalf("Failed to authenticate with Azure CLI: %v", err)
 	}
 	return cred, nil
-
 }
 
 func createResourceGroup(ctx context.Context) (*armresources.ResourceGroup, error) {
@@ -641,10 +646,10 @@ func createVirtualMachine(ctx context.Context, networkInterfaceID string) (*armc
 					Name:         to.Ptr(diskName),
 					CreateOption: to.Ptr(armcompute.DiskCreateOptionTypesFromImage),
 					Caching:      to.Ptr(armcompute.CachingTypesReadWrite),
-					// ManagedDisk: &armcompute.ManagedDiskParameters{
-					// 	StorageAccountType: to.Ptr(armcompute.StorageAccountTypesStandardLRS), // OSDisk type Standard/Premium HDD/SSD
-					// },
-					//DiskSizeGB: to.Ptr[int32](100), // default 127G
+					ManagedDisk: &armcompute.ManagedDiskParameters{
+						StorageAccountType: to.Ptr(armcompute.StorageAccountTypesStandardLRS), // OSDisk type Standard/Premium HDD/SSD
+					},
+					DiskSizeGB: to.Ptr[int32](128), // default 127G
 				},
 			},
 			HardwareProfile: &armcompute.HardwareProfile{
@@ -672,6 +677,11 @@ func createVirtualMachine(ctx context.Context, networkInterfaceID string) (*armc
 					{
 						ID: to.Ptr(networkInterfaceID),
 					},
+				},
+			},
+			SecurityProfile: &armcompute.SecurityProfile{
+				UefiSettings: &armcompute.UefiSettings{
+					SecureBootEnabled: to.Ptr(false),
 				},
 			},
 		},

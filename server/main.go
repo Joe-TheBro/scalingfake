@@ -90,7 +90,7 @@ func listenForHostLocalDescription(peerConnection *pionWebRTC.PeerConnection, en
 	
 }
 
-func serverIncomingTrack(track *pionWebRTC.TrackRemote, receiver *pionWebRTC.RTPReceiver) {
+func serverIncomingTrack(track *pionWebRTC.TrackRemote) {
 	for {
 		// Incoming packets are h264 NewTrackLocalStaticSample packets
 		videoDevice, err := gocv.VideoWriterFile("/dev/video0", "MJPG", 60, 1920, 1080, true)
@@ -196,7 +196,7 @@ func main() {
 	// Handle incoming tracks
 	log.Info("Waiting for camera video")
 	peerConnection.OnTrack(func(track *pionWebRTC.TrackRemote, receiver *pionWebRTC.RTPReceiver) {
-		go serverIncomingTrack(track, receiver)
+		go serverIncomingTrack(track)
 	})
 
 	// Create an outgoing track

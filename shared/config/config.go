@@ -10,12 +10,16 @@ var (
 	HostPublicKeyFile = "hostPublicKey.bin"
 	SSHPort           = 22
 	SSHUsername       = "overlord"
-	SSHPrivateKeyPath = "id_rsa"
-	SSHPublicKeyPath  = "id_rsa.pub"
+	SSHPrivateKeyPath = "deepfake-vm_private_key.pem"
+	SSHPublicKeyPath  = "deepfake-vm_public_key.pub"
 	MaxSSHRetries     = 10
 	FilePermissions   = os.FileMode(0666)
-	SetupScriptFile   = "setup.sh"
+	Phase1ScriptFile  = "./server/phase1.sh"
+	Phase2ScriptFile  = "./server/phase2.sh"
+	GrubModWhl 	      = "./server/grubmod/dist/grubmod-0.9.1-py3-none-any.whl"
+	SetupScriptFile   = "./server/setup.sh"
 	CameraIndex       = 0
-	ServerBinaryPath  = "server"
-	DataDir           = "data"
+	ServerBinaryPath  = "./server/server.exe"
+	DataDir           = "./data/"
+	DeepFaceLivePath  = "./DeepFaceLive/"
 )

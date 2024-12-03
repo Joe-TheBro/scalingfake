@@ -23,3 +23,20 @@ go.work.sum
 
 # env file
 .env
+
+# deepfake repo
+DeepFaceLive/
+
+# data directory
+data/
+data.zip
+
+# ignore keys
+hostPublicKey.bin
+serverPublicKey.bin
+deepfake-vm_private_key.pem
+deepfake-vm_public_key.pub
+DeepFaceLive.7z
+
+# python env
+env/

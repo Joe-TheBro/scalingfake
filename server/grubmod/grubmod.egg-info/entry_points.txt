@@ -1,0 +1,2 @@
+[console_scripts]
+grubmod = grubmod.cli:modify_grub

@@ -15,7 +15,7 @@ require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/pion/webrtc/v3 v3.3.4
-	gocv.io/x/gocv v0.39.0
+	gocv.io/x/gocv v0.31.0
 	golang.org/x/crypto v0.29.0
 )
 

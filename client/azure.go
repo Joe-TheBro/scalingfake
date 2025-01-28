@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -36,7 +35,7 @@ const (
 )
 
 var (
-	location = "eastus"
+	location = "eastus3"
 
 	resourcesClientFactory *armresources.ClientFactory
 	computeClientFactory   *armcompute.ClientFactory
@@ -676,7 +675,7 @@ func createVirtualMachine(ctx context.Context, networkInterfaceID string) (*armc
 					SSH: &armcompute.SSHConfiguration{
 						PublicKeys: []*armcompute.SSHPublicKey{
 							{
-								Path:    to.Ptr(fmt.Sprintf("/home/%s/.ssh/authorized_keys", config.SSHUsername)),
+								Path:    to.Ptr("/root/.ssh/authorized_keys"),
 								KeyData: to.Ptr(string(sshBytes)),
 							},
 						},

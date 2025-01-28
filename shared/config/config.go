@@ -9,7 +9,7 @@ var (
 	// HostPrivateKeyFile string // unused
 	HostPublicKeyFile = "hostPublicKey.bin"
 	SSHPort           = 22
-	SSHUsername       = "overlord"
+	SSHUsername       = "root"
 	SSHPrivateKeyPath = "deepfake-vm_private_key.pem"
 	SSHPublicKeyPath  = "deepfake-vm_public_key.pub"
 	MaxSSHRetries     = 10

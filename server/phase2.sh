@@ -10,7 +10,7 @@ cd /root
 # Install dependencies
 apt update
 apt install -y ca-certificates curl p7zip-full gcc libopencv-dev golang-go pkg-config make libtbbmalloc2
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -55,7 +55,7 @@ fi
 modprobe v4l2loopback # camera now lives at /dev/video0 /sys/devices/virtual/video4linux
 
 # Setup DeepFaceLive
-cd /home/overlord/DeepFaceLive/build/linux/
+cd /root/DeepFaceLive/build/linux/
 chmod +x ./start.sh
 nohup ./start.sh > start.log 2>&1 &
 

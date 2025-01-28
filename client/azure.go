@@ -85,6 +85,17 @@ func createVM() *armnetwork.PublicIPAddress {
 	disksClient = computeClientFactory.NewDisksClient()
 
 	log.Info("Starting to create virtual machine...")
+	// check if resource group exists, this handles when the program exits unexpectedly and cleanup cannot be called
+	
+	_, err = resourceGroupClient.Get(ctx, resourceGroupName, nil)
+	if err == nil {
+		log.Info("Resource group already exists: %s", resourceGroupName)
+		log.Info("Deleting existing resource group...")
+		err = deleteResourceGroup(ctx)
+	}
+	
+	//* Anything below this point SHOULD not have an existing vm, network, etc....
+
 	resourceGroup, err := createResourceGroup(ctx)
 	if err != nil {
 		log.Fatal("cannot create resource group:%+v", err)

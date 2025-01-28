@@ -7,11 +7,12 @@ fi
 
 echo "Updating system and installing generic kernel..."
 apt update
-apt install -y linux-generic initramfs-tools pipx
+apt install -y linux-generic initramfs-tools curl
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 export PATH="$PATH:$(python3 -m site --user-base)/bin"
 hash -r
-pipx install --force /home/overlord/grubmod-0.9.1-py3-none-any.whl
+uv tool install --force /root/grubmod-0.9.1-py3-none-any.whl
 
 echo "Installing Azure Linux Agent..."
 apt install -y walinuxagent
@@ -46,12 +47,12 @@ sed -i "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"root=PARTUUID=$ROOT_PARTUU
 echo "Updating GRUB bootloader..."
 update-grub
 
-grubmod --kernel-version $KERNEL_VERSION
+uvx grubmod --kernel-version $KERNEL_VERSION
 
 
 echo "Creating phase2 service..."
 
-SCRIPT_PATH="/home/overlord/phase2.sh"
+SCRIPT_PATH="/root/phase2.sh"
 SERVICE_PATH="/etc/systemd/system/phase2.service"
 
 # Ensure the script exists

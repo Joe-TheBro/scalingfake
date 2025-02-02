@@ -304,15 +304,15 @@ func SetupServer(ctx *SSHContext) error {
 
 	log.Info("Copying server public key")
 	// Copy the host public key to the remote server
-	err := CopyFile(ctx, config.HostPublicKeyFile, "/root/hostPublicKey.bin")
-	if err != nil {
-		log.Error("failed to copy host public key: %v", err)
-		return err
-	}
+	// err := CopyFile(ctx, config.HostPublicKeyFile, "/root/hostPublicKey.bin")
+	// if err != nil {
+	// 	log.Error("failed to copy host public key: %v", err)
+	// 	return err
+	// }
 
 	log.Info("Copying startup scripts")
 	// Copy shellscript to the remote server
-	err = CopyFile(ctx, config.Phase1ScriptFile, "/root/phase1.sh")
+	err := CopyFile(ctx, config.Phase1ScriptFile, "/root/phase1.sh")
 	if err != nil {
 		log.Error("failed to copy setup script: %v", err)
 		return err

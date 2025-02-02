@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/Joe-TheBro/scalingfake/shared/config"
 	"github.com/Joe-TheBro/scalingfake/shared/utils"
 	"github.com/charmbracelet/log"
@@ -55,8 +57,8 @@ func background_main() {
 		log.Fatal("Error setting up server...", err)
 	}
 
-	log.Info("Server setup complete")
-	log.Info("Connecting to SSH signaling server...")
+	log.Info("Server is setting up...")
+	log.Info("Attempting to connect to SSH signaling server...")
 	signalingctxSSH := &utils.SSHContext{
 		Host:           UIIPAddress, //! publicIP.Properties.IPAddress,
 		Port:           2222,
@@ -65,16 +67,12 @@ func background_main() {
 		SSHClient:      nil,
 	}
 
-	retry = 0
 	for {
 		signalingctxSSH.SSHClient, err = utils.ConnectSSH(signalingctxSSH)
 		if err != nil {
-			if retry < config.MaxSSHRetries {
-				log.Warn("Error connecting to SSH signaling server, retrying")
-				retry++
-				continue
-			}
-			log.Fatal("Failed connecting to SSH signaling server", err)
+			log.Warn("Unable to connect to SSH signaling server (this likely means the server is still being setup), retrying in 5 seconds...")
+			time.Sleep(5 * time.Second)
+			continue
 		}
 		break
 	}

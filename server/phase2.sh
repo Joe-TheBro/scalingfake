@@ -7,6 +7,14 @@ fi
 
 cd /root
 
+# Check if uv is installed
+if ! command -v uv &> /dev/null; then
+  echo "uv is not installed. Installing..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  source $HOME/.local/bin/env
+  hash -r
+fi
+
 # Install dependencies
 apt update
 apt install -y ca-certificates curl p7zip-full gcc libopencv-dev golang-go pkg-config make libtbbmalloc2

@@ -45,12 +45,12 @@ func background_main() {
 	}
 	defer os.Remove(config.HostPublicKeyFile)
 
-	// Allocate a VM
-	log.Info("Allocating VM")
-	publicIP := allocateVM()
-	if *publicIP.Properties.IPAddress == "" {
-		log.Fatal("Error allocating VM, no public IP address")
-	}
+	// Allocate a VM //! fix this if you want to use it
+	// log.Info("Allocating VM")
+	// publicIP := allocateVM()
+	// if *publicIP.Properties.IPAddress == "" {
+	// 	log.Fatal("Error allocating VM, no public IP address")
+	// }
 
 	//generate ssh keypair //! THIS IS DONE ALREADY IN azure.go
 	// log.Info("Generating SSH key pair...")
@@ -62,7 +62,7 @@ func background_main() {
 	// Connect to the VM
 	log.Info("Connecting to VM via SSH...")
 	ctxSSH := &utils.SSHContext{
-		Host:           *publicIP.Properties.IPAddress,
+		Host:           UIIPAddress, //! publicIP.Properties.IPAddress,
 		Port:           config.SSHPort,
 		Username:       config.SSHUsername,
 		PrivateKeyPath: config.SSHPrivateKeyPath,
@@ -125,7 +125,7 @@ func background_main() {
 
 	// Handle WebRTC signaling
 	log.Info("Starting encrypted WebRTC signaling")
-	conn, err := net.Dial("tcp", *publicIP.Properties.IPAddress+":9001")
+	conn, err := net.Dial("tcp", UIIPAddress+":9001")
 	if err != nil {
 		log.Fatal("Error connecting to server:", err)
 	}

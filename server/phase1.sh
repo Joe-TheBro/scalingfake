@@ -10,7 +10,7 @@ apt update
 apt install -y linux-generic initramfs-tools curl
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-export PATH="$PATH:$(python3 -m site --user-base)/bin"
+source $HOME/.local/bin/env
 hash -r
 uv tool install --force /root/grubmod-0.9.1-py3-none-any.whl
 

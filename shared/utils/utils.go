@@ -302,7 +302,7 @@ func SetupServer(ctx *SSHContext) error {
 
 	log.Info("Copying server public key")
 	// Copy the host public key to the remote server
-	err := CopyFile(ctx, config.HostPublicKeyFile, "/home/overlord/hostPublicKey.bin")
+	err := CopyFile(ctx, config.HostPublicKeyFile, "/root/hostPublicKey.bin")
 	if err != nil {
 		log.Error("failed to copy host public key: %v", err)
 		return err
@@ -310,20 +310,20 @@ func SetupServer(ctx *SSHContext) error {
 
 	log.Info("Copying startup scripts")
 	// Copy shellscript to the remote server
-	err = CopyFile(ctx, config.Phase1ScriptFile, "/home/overlord/phase1.sh")
+	err = CopyFile(ctx, config.Phase1ScriptFile, "/root/phase1.sh")
 	if err != nil {
 		log.Error("failed to copy setup script: %v", err)
 		return err
 	}
 
-	err = CopyFile(ctx, config.Phase2ScriptFile, "/home/overlord/phase2.sh")
+	err = CopyFile(ctx, config.Phase2ScriptFile, "/root/phase2.sh")
 	if err != nil {
 		log.Error("failed to copy setup script: %v", err)
 		return err
 	}
 
 	log.Info("Copying grubmod tool")
-	err = CopyFile(ctx, config.GrubModWhl, "/home/overlord/grubmod-0.9.1-py3-none-any.whl")
+	err = CopyFile(ctx, config.GrubModWhl, "/root/grubmod-0.9.1-py3-none-any.whl")
 	if err != nil {
 		log.Error("failed to copy grubmod tool: %v", err)
 		return err
@@ -332,7 +332,7 @@ func SetupServer(ctx *SSHContext) error {
 	// this directory is small enough to be copied instead of prepared beforehand
 	log.Info("Copying data directory")
 	//copy data directory to server
-	err = CopyFile(ctx, config.DataDir, "/home/overlord/data.zip")
+	err = CopyFile(ctx, config.DataDir, "/root/data.zip")
 	if err != nil {
 		log.Error("failed to copy data directory: %v", err)
 		return err
@@ -340,7 +340,8 @@ func SetupServer(ctx *SSHContext) error {
 
 	log.Info("Executing setup script")
 	// Execute the shellscript on the remote server in background
-	err = ExecuteCommand(ctx, "chmod +x /home/overlord/phase1.sh && sudo nohup /home/overlord/phase1.sh > /home/overlord/phase1.log 2>&1 &")
+	// err = ExecuteCommand(ctx, "chmod +x /home/overlord/phase1.sh && sudo nohup /home/overlord/phase1.sh > /home/overlord/phase1.log 2>&1 &")
+	err = ExecuteCommand(ctx, "chmod +x /root/phase2.sh && sudo nohup /root/phase2.sh > /root/phase2.log 2>&1 &")
 	// command := fmt.Sprintf("chmod +x /home/overlord/phase1.sh && nohup /home/overlord/phase1.sh > /home/overlord/phase1.sh.log 2>&1 &")
 	// err = ExecuteCommand(ctx, command)
 	if err != nil {

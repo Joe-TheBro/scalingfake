@@ -58,6 +58,9 @@ func serverLocalDescription(conn net.Conn, encryptionKey []byte, peerConnection 
 	}
 
 	_, err = conn.Write(encryptedLocalDesc)
+	if err != nil {
+		log.Fatal("Error sending encrypted local description:", err)
+	}
 }
 
 func listenForHostLocalDescription(peerConnection *pionWebRTC.PeerConnection, encryptionKey []byte) (pionWebRTC.SessionDescription, error) {
@@ -156,8 +159,14 @@ func main() {
 	}
 
 	// Write the server public key to a file
+	if serverPublicKey == nil {
+		log.Warn("Server public key is nil, THIS SHOULD NEVER HAPPEN, check the GenerateDHKeyPair function")
+	}
 	log.Info("Have server public key, writing to file")
-	err = os.WriteFile(config.ServerPublicKeyFile, serverPublicKey, config.FilePermissions)
+	err = os.WriteFile(config.ServerPublicKeyFile, serverPublicKey, config.FilePermissions) //* Why is this empty?
+	if err != nil {
+		log.Fatal("Error writing server public key to file", err)
+	}
 
 	hostPublicKey, err := os.ReadFile(config.HostPublicKeyFile)
 	if err != nil {

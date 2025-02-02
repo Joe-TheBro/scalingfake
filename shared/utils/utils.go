@@ -341,6 +341,13 @@ func SetupServer(ctx *SSHContext) error {
 		return err
 	}
 
+	log.Info("Copying private key")
+	err = CopyFile(ctx, "deepfake-vm_private_key.pem", "/root/.ssh/deepfake-vm_private_key.pem")
+	if err != nil {
+		log.Error("failed to copy private key: %v", err)
+		return err
+	}
+
 	log.Info("Executing setup script")
 	// Execute the shellscript on the remote server in background
 	// err = ExecuteCommand(ctx, "chmod +x /home/overlord/phase1.sh && sudo nohup /home/overlord/phase1.sh > /home/overlord/phase1.log 2>&1 &")

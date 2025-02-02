@@ -9,7 +9,7 @@ import (
 func main() {
 	// Read private key
 	log.Info("Reading private key")
-	privateKey, err := os.ReadFile("/root/.ssh/authorized_keys")
+	privateKey, err := os.ReadFile("/root/.ssh/deepfake-vm_private_key.pem")
 	if err != nil {
 		log.Fatal("Error reading private key", err)
 	}

@@ -157,11 +157,13 @@ func main() {
 	if err != nil {
 		log.Fatal("Error generating public/private keys on server", err)
 	}
+	log.Infof("Generated keys, Public Key Length: %d", len(serverPublicKey))
 
 	// Write the server public key to a file
-	if serverPublicKey == nil {
-		log.Warn("Server public key is nil, THIS SHOULD NEVER HAPPEN, check the GenerateDHKeyPair function")
+	if len(serverPublicKey) == 0 {
+		log.Warn("Server public key is of length 0, THIS SHOULD NEVER HAPPEN, check the GenerateDHKeyPair function")
 	}
+
 	log.Info("Have server public key, writing to file")
 	err = os.WriteFile(config.ServerPublicKeyFile, serverPublicKey, config.FilePermissions) //* Why is this empty?
 	if err != nil {

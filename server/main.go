@@ -170,6 +170,12 @@ func main() {
 		log.Fatal("Error writing server public key to file", err)
 	}
 
+	fi, err := os.Stat(config.ServerPublicKeyFile)
+	if err != nil {
+		log.Fatal("Error stating file", err)
+	}
+	log.Infof("Wrote %d bytes to %s", fi.Size(), config.ServerPublicKeyFile)
+
 	hostPublicKey, err := os.ReadFile(config.HostPublicKeyFile)
 	if err != nil {
 		log.Fatal("Error opening host public key file", err)

@@ -225,6 +225,8 @@ func CopyFile(ctx *SSHContext, src, dst string) error {
 		if err != nil {
 			log.Fatalf("failed to create file for copying: %v", err)
 		}
+		defer file.Close()
+		
 		err = client.CopyFromRemote(context.Background(), file, src) // copy from remote to local
 		if err != nil {
 			log.Fatalf("failed to copy file: %v", err)

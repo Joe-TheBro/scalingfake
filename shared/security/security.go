@@ -87,7 +87,7 @@ func DecryptMessage(key, ciphertext []byte) ([]byte, error) {
 }
 
 func GetServerPublicKey(ctx *utils.SSHContext) error {
-	utils.CopyFile(ctx, config.ServerPublicKeyFile, config.ServerPublicKeyFile)
+	utils.CopyFile(ctx, "/root/"+config.ServerPublicKeyFile, config.ServerPublicKeyFile)
 	log.Info("Received server public key")
 	return nil
 }

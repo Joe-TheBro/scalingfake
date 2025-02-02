@@ -276,8 +276,8 @@ func CleanupClient() {
 	}
 
 	if _, err := os.Stat("deepfake-vm_private_key.pem"); err == nil {
-		os.Remove("deepfake-vm_private_key.pem")
-		// log.Warn("deepfake-vm_private_key.pem not removed")
+		// os.Remove("deepfake-vm_private_key.pem")
+		log.Warn("deepfake-vm_private_key.pem not removed")
 	}
 
 	if _, err := os.Stat("deepfake-vm_public_key.pub"); err == nil {

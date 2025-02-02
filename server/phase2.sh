@@ -17,7 +17,7 @@ fi
 
 # Install dependencies
 apt update
-apt install -y ca-certificates curl p7zip-full gcc libopencv-dev golang-go pkg-config make libtbbmalloc2
+apt install -y ca-certificates curl p7zip-full gcc libopencv-dev golang-go pkg-config make libtbbmalloc2 ffmpeg
 # curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
 install -m 0755 -d /etc/apt/keyrings
@@ -49,7 +49,7 @@ apt install -y nvidia-driver-470-server
 apt install -y v4l2loopback-dkms # install after cuda to avoid kernel version mismatch
 
 # Download DeepFaceLive files from Google Drive
-uvx gdown 1QwrnSH-Yq8tkX_H2SVa-Zz7OXbE2hhAM
+uvx gdown 11fwaxTLev2EUv6k7M591liFViaPYo0YJ
 
 # Extract files
 7z x DeepFaceLive.7z -p"ghubsadge"

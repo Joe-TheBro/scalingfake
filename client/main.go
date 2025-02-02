@@ -98,7 +98,8 @@ func (m *model) View() string {
 		return docStyle.Render(m.textinput.View())
 	case logView:
 		// Clear the screen and render a log view
-		tea.ClearScreen()
+		// tea.ClearScreen() // this doesn’t work 
+		// fmt.Printf("\033[H\033[2J") // this does
 		// return docStyle.Render(m.List.View())
 		return docStyle.Render(m.textinput.View())
 	default:

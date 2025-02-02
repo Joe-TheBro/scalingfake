@@ -47,7 +47,8 @@ func ConnectSSH(ctx *SSHContext) (*ssh.Client, error) {
 
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", ctx.Host, ctx.Port), config)
 	if err != nil {
-		log.Fatalf("Error dialing SSH server: %v", err)
+		log.Errorf("Error dialing SSH server: %v", err)
+		return nil, err
 	}
 
 	return client, nil

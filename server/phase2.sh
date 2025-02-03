@@ -17,7 +17,7 @@ fi
 
 # Install dependencies
 apt update
-apt install -y ca-certificates curl p7zip-full gcc libopencv-dev golang-go pkg-config make libtbbmalloc2 ffmpeg
+apt install -y ca-certificates curl p7zip-full gcc libopencv-dev golang-go pkg-config make libtbbmalloc2 ffmpeg 
 # curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env
 install -m 0755 -d /etc/apt/keyrings
@@ -44,9 +44,13 @@ rm cuda-keyring_1.1-1_all.deb
 apt update
 apt install -y cuda-12-6
 apt install -y nvidia-driver-470-server
+apt install -y nvidia-container-toolkit
 
 # Install v4l2loopback
 apt install -y v4l2loopback-dkms # install after cuda to avoid kernel version mismatch
+
+# restart docker to recognize nvidia runtime and v4l2loopback
+systemctl restart docker
 
 # Download DeepFaceLive files from Google Drive
 uvx gdown 11fwaxTLev2EUv6k7M591liFViaPYo0YJ

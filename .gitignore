@@ -40,3 +40,7 @@ DeepFaceLive.7z
 
 # python env
 env/
+
+# docker configs
+.docker/
+docker_config.json

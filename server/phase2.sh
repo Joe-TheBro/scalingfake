@@ -7,6 +7,7 @@ fi
 
 cd /root
 
+
 # Check if uv is installed
 if ! command -v uv &> /dev/null; then
   echo "uv is not installed. Installing..."

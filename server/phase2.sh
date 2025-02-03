@@ -63,6 +63,7 @@ if [ -f "data.zip" ]; then
   rm data.zip
 fi
 
+
 # Setup Camera
 modprobe v4l2loopback # camera now lives at /dev/video0 /sys/devices/virtual/video4linux
 

@@ -224,7 +224,7 @@ func HandleWebRTCSignaling(channel ssh.Channel, peerConnection *webrtc.PeerConne
 	defer channel.Close()
 
 	// Create channel buffer
-	buf := make([]byte, 2048)
+	buf := make([]byte, 4096)
 	n, err := channel.Read(buf)
 	if err != nil && err != io.EOF {
 		log.Fatal("Error reading from signaling channel:", err)
@@ -311,7 +311,6 @@ func ProcessSDPOffer(sdpOffer string, peerConnection *webrtc.PeerConnection) str
 
 func WriteOutgoingTrack(peerConnection *webrtc.PeerConnection, track *webrtc.TrackLocalStaticRTP) {
 	client := &gortsplib.Client{}
-	defer client.Close()
 	// Create a gortsplib client to read from the RTSP server. 
 	u, err := base.ParseURL("rtsp://127.0.0.1:1234/")
 	if err != nil {
@@ -344,6 +343,8 @@ func WriteOutgoingTrack(peerConnection *webrtc.PeerConnection, track *webrtc.Tra
 	client.OnPacketRTCPAny(func(medi *description.Media, pkt rtcp.Packet) {
 		log.Info("Received RTCP packet")
 	})
+
+	select {}
 }
 
 func HandleIncomingTrack(track *webrtc.TrackRemote, data chan []byte) {
@@ -361,22 +362,28 @@ func HandleIncomingTrack(track *webrtc.TrackRemote, data chan []byte) {
 }
 
 func WriteToCamera(data chan []byte) {
-	// use gocv to write to camera feed
-	virtualCam, err := gocv.VideoWriterFile("/dev/video0", "MJPG", 60, 1920, 1080, true)
-	if err != nil {
-		log.Fatal("Error opening virtual camera:", err)
-	}
-	defer virtualCam.Close()
-
-	img := gocv.NewMat()
-	defer img.Close()
-
-	for imgBytes := range data {
-		img, err = gocv.IMDecode(imgBytes, gocv.IMReadColor)
-		if err != nil {
-			log.Error("Error decoding image bytes:", err)
-			continue
-		}
-		virtualCam.Write(img)
-	}
+    virtualCam, err := gocv.VideoWriterFile("/dev/video0", "MJPG", 60, 1920, 1080, true)
+    if err != nil {
+        log.Fatal("Error opening virtual camera:", err)
+    }
+    defer virtualCam.Close()
+    
+    var img gocv.Mat
+    for imgBytes := range data {
+        newImg, err := gocv.IMDecode(imgBytes, gocv.IMReadColor)
+        if err != nil {
+            log.Error("Error decoding image bytes:", err)
+            continue
+        }
+        // Close previous Mat if it was allocated
+        if !img.Empty() {
+            img.Close()
+        }
+        img = newImg
+        virtualCam.Write(img)
+    }
+    // Final cleanup
+    if !img.Empty() {
+        img.Close()
+    }
 }

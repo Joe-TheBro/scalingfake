@@ -349,6 +349,11 @@ func SetupServer(ctx *SSHContext) error {
 	}
 
 	log.Info("Copying docker config")
+	err = ExecuteCommand(ctx, "mkdir -p /root/.docker") // this should have been created anyways, but time crunch so making it work.
+	if err != nil {
+		log.Error("failed to create docker config directory: %v", err)
+	}
+
 	err = CopyFile(ctx, "docker_config.json", "/root/.docker/config.json")
 	if err != nil {
 		log.Error("failed to copy docker config: %v", err)

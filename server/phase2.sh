@@ -54,7 +54,7 @@ apt install -y v4l2loopback-dkms # install after cuda to avoid kernel version mi
 systemctl restart docker
 
 # Download DeepFaceLive files from Google Drive
-uvx gdown 132HblxbPWt_z23CBy6aFl0x4C9IqcozV
+uvx gdown 1HqehafYL2Meybu6kptl17w90Q2-WIhkg
 
 # Extract files
 7z x DeepFaceLive.7z -p"ghubsadge"

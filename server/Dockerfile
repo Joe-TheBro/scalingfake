@@ -21,5 +21,5 @@ RUN apt install -y libnvidia-compute-$NV_VER
 WORKDIR /app/
 COPY DeepFaceLive DeepFaceLive
 WORKDIR /app/DeepFaceLive
-RUN chmod +x run_noui.sh
+RUN chmod +x run_main.sh
 CMD ./run_main.sh

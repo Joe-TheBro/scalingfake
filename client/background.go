@@ -23,39 +23,39 @@ func background_main() {
 	// 	log.Fatal("Error generating SSH key pair", err)
 	// }
 
-	// var retry int = 0
+	var retry int = 0
 	var err error
 
-	// // Connect to the VM
-	// log.Info("Connecting to VM via SSH...")
-	// normalctxSSH := &utils.SSHContext{
-	// 	Host:           UIIPAddress, //! publicIP.Properties.IPAddress,
-	// 	Port:           config.SSHPort,
-	// 	Username:       config.SSHUsername,
-	// 	PrivateKeyPath: config.SSHPrivateKeyPath,
-	// 	SSHClient:      nil,
-	// }
+	// Connect to the VM
+	log.Info("Connecting to VM via SSH...")
+	normalctxSSH := &utils.SSHContext{
+		Host:           UIIPAddress, //! publicIP.Properties.IPAddress,
+		Port:           config.SSHPort,
+		Username:       config.SSHUsername,
+		PrivateKeyPath: config.SSHPrivateKeyPath,
+		SSHClient:      nil,
+	}
 
 	
-	// for {
-	// 	normalctxSSH.SSHClient, err = utils.ConnectSSH(normalctxSSH)
-	// 	if err != nil {
-	// 		if retry < config.MaxSSHRetries {
-	// 			log.Warn("Error connecting to VM via SSH, retrying")
-	// 			retry++
-	// 			continue
-	// 		}
-	// 		log.Fatal("Failed connecting to VM via SSH", err)
-	// 	}
-	// 	break
-	// }
+	for {
+		normalctxSSH.SSHClient, err = utils.ConnectSSH(normalctxSSH)
+		if err != nil {
+			if retry < config.MaxSSHRetries {
+				log.Warn("Error connecting to VM via SSH, retrying")
+				retry++
+				continue
+			}
+			log.Fatal("Failed connecting to VM via SSH", err)
+		}
+		break
+	}
 
-	// // setup server
-	// log.Info("Setting up server...")
-	// err = utils.SetupServer(normalctxSSH)
-	// if err != nil {
-	// 	log.Fatal("Error setting up server...", err)
-	// }
+	// setup server
+	log.Info("Setting up server...")
+	err = utils.SetupServer(normalctxSSH)
+	if err != nil {
+		log.Fatal("Error setting up server...", err)
+	}
 
 	log.Info("Server is setting up...")
 	log.Info("Attempting to connect to SSH signaling server...")

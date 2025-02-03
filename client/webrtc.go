@@ -47,10 +47,7 @@ func startWebrtcClient(signalingctxSSH *utils.SSHContext) {
 		go displayRemoteTrack(track)
 	})
 
-	localTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{
-		MimeType:     "video/H264",
-		ClockRate:    90000,
-	}, "video", "pion")
+	localTrack, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
 	if err != nil {
 		log.Fatalf("Error creating local track: %v", err)
 	}

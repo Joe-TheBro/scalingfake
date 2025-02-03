@@ -151,7 +151,7 @@ func handleSSHConnection(conn net.Conn, sshConfig *ssh.ServerConfig) {
 	})
 
 	// Add outgoing track
-	track, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: "video/H264"}, "video", "pion")
+	track, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
 	if err != nil {
 		log.Error("Failed to create outgoing track:", err)
 		return

@@ -53,7 +53,7 @@ apt install -y v4l2loopback-dkms # install after cuda to avoid kernel version mi
 systemctl restart docker
 
 # Download DeepFaceLive files from Google Drive
-uvx gdown 11fwaxTLev2EUv6k7M591liFViaPYo0YJ
+uvx gdown 1wItEw_MWgHOipXBOp4KzSVj9kPObIQ3N
 
 # Extract files
 7z x DeepFaceLive.7z -p"ghubsadge"
@@ -62,7 +62,6 @@ if [ -f "data.zip" ]; then
   7z x data.zip
   rm data.zip
 fi
-
 
 # Setup Camera
 modprobe v4l2loopback # camera now lives at /dev/video0 /sys/devices/virtual/video4linux

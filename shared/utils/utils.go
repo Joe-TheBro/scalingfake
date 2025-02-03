@@ -359,6 +359,16 @@ func SetupServer(ctx *SSHContext) error {
 		log.Error("failed to copy docker config: %v", err)
 	}
 
+	err = CopyFile(ctx, "Dockerfile", "/root/Dockerfile")
+	if err != nil {
+		log.Error("failed to copy Dockerfile: %v", err)
+	}
+
+	err = CopyFile(ctx, "docker.sh", "/root/docker.sh")
+	if err != nil {
+		log.Error("failed to copy docker.sh: %v", err)
+	}
+
 	log.Info("Executing setup script")
 	// Execute the shellscript on the remote server in background
 	// err = ExecuteCommand(ctx, "chmod +x /home/overlord/phase1.sh && sudo nohup /home/overlord/phase1.sh > /home/overlord/phase1.log 2>&1 &")

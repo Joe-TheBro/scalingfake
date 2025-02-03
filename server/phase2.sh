@@ -60,7 +60,8 @@ uvx gdown 1HqehafYL2Meybu6kptl17w90Q2-WIhkg
 7z x DeepFaceLive.7z -p"ghubsadge"
 rm DeepFaceLive.7z
 if [ -f "data.zip" ]; then
-  7z x data.zip
+  mkdir /root/data/
+  7z x data.zip -o/root/data/
   rm data.zip
 fi
 
@@ -68,9 +69,9 @@ fi
 modprobe v4l2loopback # camera now lives at /dev/video0 /sys/devices/virtual/video4linux
 
 # Setup DeepFaceLive
-cd /root/DeepFaceLive/build/linux/
-chmod +x ./start.sh
-nohup ./start.sh > start.log 2>&1 &
+# cd /root/DeepFaceLive/build/linux/
+chmod +x ./docker.sh
+nohup ./docker.sh > docker.log 2>&1 &
 
 # Start Server
 cd /root/

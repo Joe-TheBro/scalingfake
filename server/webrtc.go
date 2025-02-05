@@ -4,18 +4,17 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"os"
+	"strings"
 	"sync"
 
-	"github.com/bluenviron/gortsplib/v4"
-	"github.com/bluenviron/gortsplib/v4/pkg/base"
-	"github.com/bluenviron/gortsplib/v4/pkg/description"
-	"github.com/bluenviron/gortsplib/v4/pkg/format"
+	"github.com/bluenviron/gortsplib/v4/pkg/sdp"
 	"github.com/charmbracelet/log"
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/intervalpli"
-	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
 	"gocv.io/x/gocv"
@@ -310,40 +309,83 @@ func ProcessSDPOffer(sdpOffer string, peerConnection *webrtc.PeerConnection) str
 }
 
 func WriteOutgoingTrack(peerConnection *webrtc.PeerConnection, track *webrtc.TrackLocalStaticRTP) {
-	client := &gortsplib.Client{}
-	// Create a gortsplib client to read from the RTSP server. 
-	u, err := base.ParseURL("rtsp://127.0.0.1:1234/")
+	// Read the SDP file that describes the RTP stream
+	sdpBytes, err := os.ReadFile("./data/output.sdp")
 	if err != nil {
-		log.Fatal("Error parsing RTSP URL:", err)
-	}
-	
-	err = client.Start(u.Scheme, u.Host)
-	if err != nil {
-		log.Fatal("Error starting RTSP client:", err)
+		log.Fatal("Error reading SDP file:", err)
 	}
 
-	desc, _, err := client.Describe(u)
-	if err != nil {
-		log.Fatal("Error describing RTSP stream:", err)
+	// Parse the SDP file
+	sdpString := string(sdpBytes)
+	if sdpString == "" {
+		log.Fatal("SDP file is empty")
 	}
 
-	err = client.SetupAll(desc.BaseURL, desc.Medias)
-	if err != nil {
-		log.Fatal("Error setting up RTSP stream:", err)
+	// Remove the first line of the SDP file
+	sdpString = strings.Split(sdpString, "\n")[1]
+	sdpBytes = []byte(sdpString)
+
+	var session sdp.SessionDescription
+	if err := session.Unmarshal(sdpBytes); err != nil {
+		log.Fatal("Error unmarshalling SDP:", err)
 	}
 
-	client.OnPacketRTPAny(func(medi *description.Media, forma format.Format, pkt *rtp.Packet) {
-		// Send packet to the WebRTC track.
-		log.Info("Received RTP packet")
-		if err := track.WriteRTP(pkt); err != nil {
-			log.Fatal("Error writing RTP packet to track:", err)
+	var listenIP string
+	var listenPort int
+
+	if session.ConnectionInformation != nil && session.ConnectionInformation.Address != nil {
+		listenIP = session.ConnectionInformation.Address.Address
+	}
+
+	for _, md := range session.MediaDescriptions {
+		if md.MediaName.Media == "video" {
+			if md.ConnectionInformation != nil && md.ConnectionInformation.Address != nil {
+				listenIP = md.ConnectionInformation.Address.Address
+			}
+			listenPort = md.MediaName.Port.Value
+			break
 		}
-	})
+	}
 
-	client.OnPacketRTCPAny(func(medi *description.Media, pkt rtcp.Packet) {
-		log.Info("Received RTCP packet")
-	})
+	if listenIP == "" {
+		// fallback for no c value
+		listenIP = "0.0.0.0"
+	}
+	if listenPort == 0 {
+		log.Fatal("No video port found in SDP")
+	}
 
+	listenAddr := fmt.Sprintf("%s:%d", listenIP, listenPort)
+	udpConn, err := net.ListenPacket("udp", listenAddr)
+	if err != nil {
+		log.Fatal("Error listening on UDP:", err)
+	}
+	defer udpConn.Close()
+
+	log.Info("Listening for incoming RTP packets on", listenAddr)
+
+	go func() {
+		buf := make([]byte, 1500) // UDP MTU
+		for {
+			n, _, err := udpConn.ReadFrom(buf)
+			if err != nil {
+				log.Error("Error reading from UDP:", err)
+				return
+			}
+
+			var pkt rtp.Packet
+			if err := pkt.Unmarshal(buf[:n]); err != nil {
+				log.Error("Error unmarshalling RTP packet:", err)
+				continue
+			}
+
+			if err := track.WriteRTP(&pkt); err != nil {
+				log.Error("Error writing RTP packet:", err)
+			}
+		}
+	}()
+
+	// Block indefinitely
 	select {}
 }
 

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/bluenviron/gortsplib/v4/pkg/sdp"
@@ -322,7 +321,7 @@ func WriteOutgoingTrack(peerConnection *webrtc.PeerConnection, track *webrtc.Tra
 	}
 
 	// Remove the first line of the SDP file
-	sdpString = strings.Split(sdpString, "\n")[1]
+	// sdpString = strings.Split(sdpString, "\n")[1]
 	sdpBytes = []byte(sdpString)
 
 	var session sdp.SessionDescription

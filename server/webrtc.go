@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"sync"
 
 	"github.com/bluenviron/gortsplib/v4/pkg/sdp"
@@ -16,7 +17,6 @@ import (
 	"github.com/pion/interceptor/pkg/intervalpli"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
-	"gocv.io/x/gocv"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -145,7 +145,7 @@ func handleSSHConnection(conn net.Conn, sshConfig *ssh.ServerConfig) {
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		data := make(chan []byte)
 		go HandleIncomingTrack(track, data)
-		go WriteToCamera(data)
+		go WriteToUDP(data)
 	})
 
 	// Add outgoing track
@@ -402,29 +402,61 @@ func HandleIncomingTrack(track *webrtc.TrackRemote, data chan []byte) {
 	}
 }
 
-func WriteToCamera(data chan []byte) {
-    virtualCam, err := gocv.VideoWriterFile("/dev/video0", "MJPG", 60, 1920, 1080, true)
-    if err != nil {
-        log.Fatal("Error opening virtual camera:", err)
-    }
-    defer virtualCam.Close()
-    
-    var img gocv.Mat
-    for imgBytes := range data {
-        newImg, err := gocv.IMDecode(imgBytes, gocv.IMReadColor)
-        if err != nil {
-            log.Error("Error decoding image bytes:", err)
-            continue
-        }
-        // Close previous Mat if it was allocated
-        if !img.Empty() {
-            img.Close()
-        }
-        img = newImg
-        virtualCam.Write(img)
-    }
-    // Final cleanup
-    if !img.Empty() {
-        img.Close()
-    }
+func WriteToUDP(data chan []byte) {
+	ffmpegCmd := exec.Command("ffmpeg",
+		"-f", "h264",
+		"-pixel_format", "yuv420p",
+		"-video_size", "640x480", //* This has to match python
+		"-framerate", "30",
+		"-i", "pipe:0",
+		"-c:v", "copy",
+		"-preset", "ultrafast",
+		"-tune", "zerolatency",
+		"-f", "mpegts",
+		"udp://127.0.0.1:5000",
+	)
+
+	ffmpegStdin, err := ffmpegCmd.StdinPipe()
+	if err != nil {
+		log.Fatalf("Error getting ffmpeg stdin pipe: %v", err)
+	}
+
+	err = ffmpegCmd.Start()
+	if err != nil {
+		log.Fatalf("Error starting ffmpeg: %v", err)
+	}
+
+	for d := range data {
+		_, err := ffmpegStdin.Write(d)
+		if err != nil {
+			log.Fatalf("Error writing to ffmpeg stdin: %v", err)
+		}
+	}
 }
+
+// func WriteToCamera(data chan []byte) {
+//     virtualCam, err := gocv.VideoWriterFile("/dev/video0", "MJPG", 60, 1920, 1080, true)
+//     if err != nil {
+//         log.Fatal("Error opening virtual camera:", err)
+//     }
+//     defer virtualCam.Close()
+    
+//     var img gocv.Mat
+//     for imgBytes := range data {
+//         newImg, err := gocv.IMDecode(imgBytes, gocv.IMReadColor)
+//         if err != nil {
+//             log.Error("Error decoding image bytes:", err)
+//             continue
+//         }
+//         // Close previous Mat if it was allocated
+//         if !img.Empty() {
+//             img.Close()
+//         }
+//         img = newImg
+//         virtualCam.Write(img)
+//     }
+//     // Final cleanup
+//     if !img.Empty() {
+//         img.Close()
+//     }
+// }

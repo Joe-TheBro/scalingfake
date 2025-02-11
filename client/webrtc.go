@@ -135,7 +135,7 @@ func captureAndSendLocalVideo(track *webrtc.TrackLocalStaticRTP) {
 	var timestamp uint32 = 0
 	ssrc := uint32(rand.Uint32())
 
-	fps := 60
+	fps := 30
 	ticker := time.NewTicker(time.Second / time.Duration(fps))
 	defer ticker.Stop()
 

@@ -406,7 +406,7 @@ func WriteToUDP(data chan []byte) {
 	ffmpegCmd := exec.Command("ffmpeg",
 		"-f", "h264",
 		"-pixel_format", "yuv420p",
-		"-video_size", "640x480", //* This has to match python
+		"-video_size", "1920x1080", //* This has to match python
 		"-framerate", "30",
 		"-i", "pipe:0",
 		"-c:v", "copy",

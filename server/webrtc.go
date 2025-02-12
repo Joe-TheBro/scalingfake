@@ -41,7 +41,9 @@ func CreatePeerConnection() (*webrtc.PeerConnection, error) {
 	
 
 	if err := mediaEngine.RegisterCodec(webrtc.RTPCodecParameters{
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "video/H264", ClockRate: 90000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
+			RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "video/H264", ClockRate: 90000, Channels: 0, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", RTCPFeedback: nil
+		},
+		PayloadType: 96,
 	},
 		webrtc.RTPCodecTypeVideo); err != nil {
 		log.Error("Failed to register H264 codec:", err)

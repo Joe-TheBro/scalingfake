@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/bluenviron/gortsplib/v4/pkg/sdp"
 	"github.com/charmbracelet/log"
@@ -310,8 +311,19 @@ func ProcessSDPOffer(sdpOffer string, peerConnection *webrtc.PeerConnection) str
 func WriteOutgoingTrack(peerConnection *webrtc.PeerConnection, track *webrtc.TrackLocalStaticRTP) {
 	// Read the SDP file that describes the RTP stream
 	sdpBytes, err := os.ReadFile("./data/output.sdp")
-	if err != nil {
-		log.Fatal("Error reading SDP file:", err)
+	sdpTimeout := time.After(2 * time.Minute)
+	retryInterval := 2 * time.Second
+
+	for err != nil {
+		select {
+		case <-sdpTimeout:
+			log.Fatal("Timed out reading SDP file:", err)
+			return
+		default:
+			log.Warn("Error reading SDP file, retrying in 2 seconds:", err)
+			time.Sleep(retryInterval)
+			sdpBytes, err = os.ReadFile("./data/output.sdp")
+		}
 	}
 
 	// Parse the SDP file

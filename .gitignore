@@ -37,6 +37,7 @@ serverPublicKey.bin
 deepfake-vm_private_key.pem
 deepfake-vm_public_key.pub
 DeepFaceLive.7z
+DeepFaceLive.zip
 
 # python env
 env/

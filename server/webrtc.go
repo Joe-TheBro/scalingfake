@@ -155,6 +155,13 @@ func handleSSHConnection(conn net.Conn, sshConfig *ssh.ServerConfig) {
 		log.Error("Failed to create outgoing track:", err)
 		return
 	}
+
+	_, err = peerConnection.AddTrack(track)
+	if err != nil {
+		log.Error("Failed to add outgoing track:", err)
+		return
+	}
+
 	go WriteOutgoingTrack(peerConnection, track)
 
 	// Store the mapping using the remote address as a key.

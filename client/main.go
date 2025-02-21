@@ -4,17 +4,25 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
-	"github.com/charmbracelet/bubbles/list"
+	// "github.com/Joe-TheBro/scalingfake/shared/mainthread"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
+	"gocv.io/x/gocv"
 )
 
 var UIIPAddress string
 
 var docStyle = lipgloss.NewStyle().Margin(1, 2)
+
+var (
+	remoteFrameWindow *gocv.Window
+	localFrameWindow *gocv.Window
+)
 
 type viewState int
 
@@ -42,10 +50,11 @@ const (
 	logView
 )
 
+type tickMsg time.Time
+
 type model struct {
 	state     viewState
 	log       *log.Logger
-	list      list.Model
 	textinput textinput.Model
 }
 
@@ -59,7 +68,52 @@ func (m *model) Init() tea.Cmd {
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// for {
+	// 	select {
+	// 	case f := <-mainthread.MainFuncChan:
+	// 		log.Info("Running function on main thread")
+	// 		f()
+	// 	default:
+	// 		goto EndDrain
+	// 	}
+	// }
+	// EndDrain:
+
+	
 	switch msg := msg.(type) {
+	case tickMsg:
+		var safeLocalFrame gocv.Mat
+		var haveLocalFrame bool = false
+		latestLocalFrameMu.RLock()
+		if !latestLocalFrame.Empty() && localFrameWindow != nil {
+			safeLocalFrame = latestLocalFrame.Clone()
+			haveLocalFrame = true
+			defer safeLocalFrame.Close()
+		}
+		latestLocalFrameMu.RUnlock()
+
+		var safeRemoteFrame gocv.Mat
+		var haveRemoteFrame bool = false
+		latestRemoteFrameMu.RLock()
+		if !latestRemoteFrame.Empty() && remoteFrameWindow != nil {
+			safeRemoteFrame = latestRemoteFrame.Clone()
+			haveRemoteFrame = true
+			defer safeRemoteFrame.Close()
+		}
+		latestRemoteFrameMu.RUnlock()
+
+		if haveLocalFrame && haveRemoteFrame {
+			localFrameWindow.IMShow(safeLocalFrame)
+			remoteFrameWindow.IMShow(safeRemoteFrame)
+			localFrameWindow.WaitKey(1)
+			remoteFrameWindow.WaitKey(1)
+		} else if haveLocalFrame {
+			localFrameWindow.IMShow(safeLocalFrame)
+			localFrameWindow.WaitKey(1)
+		} else if haveRemoteFrame {
+			remoteFrameWindow.IMShow(safeRemoteFrame)
+			remoteFrameWindow.WaitKey(1)
+		} 
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
@@ -77,6 +131,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				go background_main()
 				return m, m.switchToLogView()
 			}
+		case "t":
+			go updateFaceSwap()
 		}
 	case tea.WindowSizeMsg:
 		// h, v := docStyle.GetFrameSize()
@@ -108,6 +164,21 @@ func (m *model) View() string {
 }
 
 func main() {
+	localFrameWindow = gocv.NewWindow("Local Frame (Sending)")
+	if localFrameWindow == nil {
+		log.Error("Failed to create localFrameWindow")
+	}
+
+	remoteFrameWindow = gocv.NewWindow("Remote Frame (Receiving)")
+	if remoteFrameWindow == nil {
+		log.Error("Failed to create remoteFrameWindow")
+	}
+
+	// remoteFrameWindow = gocv.NewWindow("Remote Frame (Receiving)")
+	// if remoteFrameWindow == nil {
+		// log.Error("Failed to create remoteFrameWindow")
+	// }
+
 	log.SetLevel(log.DebugLevel)
 	log.SetReportCaller(true)
 
@@ -130,6 +201,15 @@ func main() {
 	}
 
 	p := tea.NewProgram(&m)
+	
+	go func() {
+		ticker := time.NewTicker(33 * time.Millisecond)
+		defer ticker.Stop()
+		for range ticker.C {
+			p.Send(tickMsg(time.Now()))
+		}
+	}()
+
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)

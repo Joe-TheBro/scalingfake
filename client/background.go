@@ -6,7 +6,53 @@ import (
 	"github.com/Joe-TheBro/scalingfake/shared/config"
 	"github.com/Joe-TheBro/scalingfake/shared/utils"
 	"github.com/charmbracelet/log"
+	"gocv.io/x/gocv"
 )
+
+func updateFaceSwap() error {
+	var retry int = 0
+	var err error
+	// Copy new face img to server
+	ctx := &utils.SSHContext{
+		Host:           UIIPAddress, //! publicIP.Properties.IPAddress,
+		Port:           22,
+		Username:       config.SSHUsername,
+		PrivateKeyPath: config.SSHPrivateKeyPath,
+		SSHClient:      nil,
+	}
+
+	for {
+		ctx.SSHClient, err = utils.ConnectSSH(ctx)
+		if err != nil {
+			if retry < config.MaxSSHRetries {
+				log.Warn("Error connecting to VM via SSH, retrying")
+				retry++
+				continue
+			}
+			log.Fatal("Failed connecting to VM via SSH", err)
+		}
+		break
+	}
+
+	log.Info("Copying new face image to server...")
+	latestLocalFrameMu.RLock()
+	temp := latestLocalFrame.Clone()
+	latestLocalFrameMu.RUnlock()
+
+	// save temp to disk
+	_ = gocv.IMWrite(config.FaceImgPath, temp)
+	temp.Close()
+
+	err = utils.CopyFile(ctx, config.FaceImgPath, "/root/data/face.jpg")
+	if err != nil {
+		log.Error("failed to copy face image: %v", err)
+		return err
+	}
+
+	ctx.SSHClient.Close()
+
+	return nil
+}
 
 func background_main() {
 	// Allocate a VM //! fix this if you want to use it

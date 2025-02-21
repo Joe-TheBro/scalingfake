@@ -1,25 +1,41 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
+	"math/rand"
 	"net"
-	"os"
 	"os/exec"
+	"sort"
 	"sync"
 	"time"
 
-	"github.com/bluenviron/gortsplib/v4/pkg/sdp"
 	"github.com/charmbracelet/log"
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/intervalpli"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
+	"gocv.io/x/gocv"
 	"golang.org/x/crypto/ssh"
 )
+
+type bufferedPacket struct {
+	packet  *rtp.Packet
+	arrival time.Time
+}
+
+// JitterBuffer buffers RTP packets for a fixed delay to allow reordering.
+type JitterBuffer struct {
+	inputChan  chan *rtp.Packet
+	outputChan chan *rtp.Packet
+	maxDelay   time.Duration
+
+	mu     sync.Mutex
+	buffer []bufferedPacket
+}
 
 // global map and mutex for handling tracking connections
 var (
@@ -41,22 +57,16 @@ func CreatePeerConnection() (*webrtc.PeerConnection, error) {
 	
 
 	if err := mediaEngine.RegisterCodec(webrtc.RTPCodecParameters{
-			RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "video/H264", ClockRate: 90000, Channels: 0, SDPFmtpLine: "level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f", RTCPFeedback: nil
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType:     "video/jpeg",
+			ClockRate:    90000,		
 		},
-		PayloadType: 96,
+		PayloadType: 97,
 	},
 		webrtc.RTPCodecTypeVideo); err != nil {
-		log.Error("Failed to register H264 codec:", err)
+		log.Error("Failed to register jpeg codec:", err)
 		return nil, err
 	}
-
-	// if err := mediaEngine.RegisterCodec(webrtc.RTPCodecParameters{
-	// 	RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "video/H264", ClockRate: 48000, Channels: 0, SDPFmtpLine: "", RTCPFeedback: nil},
-	// },
-	// 	webrtc.RTPCodecTypeAudio); err != nil {
-	// 	log.Error("Failed to register H264 codec:", err)
-	// 	return nil, err
-	// }
 
 	// Create a InterceptorRegistry. This is the user configurable RTP/RTCP Pipeline.
 	// This provides NACKs, RTCP Reports and other features. If you use `webrtc.NewPeerConnection`
@@ -146,13 +156,13 @@ func handleSSHConnection(conn net.Conn, sshConfig *ssh.ServerConfig) {
 
 	// incoming tracks
 	peerConnection.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		data := make(chan []byte)
+		data := make(chan *rtp.Packet)
 		go HandleIncomingTrack(track, data)
 		go WriteToUDP(data)
 	})
 
 	// Add outgoing track
-	track, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
+	track, err := webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: "video/jpeg", ClockRate: 90000}, "video", "pion")
 	if err != nil {
 		log.Error("Failed to create outgoing track:", err)
 		return
@@ -164,7 +174,8 @@ func handleSSHConnection(conn net.Conn, sshConfig *ssh.ServerConfig) {
 		return
 	}
 
-	go WriteOutgoingTrack(peerConnection, track)
+	// go WriteOutgoingTrack(peerConnection, track)
+	go StreamMPEGTSToTrack(track)
 
 	// Store the mapping using the remote address as a key.
 	connKey := sshConn.RemoteAddr().String()
@@ -317,124 +328,295 @@ func ProcessSDPOffer(sdpOffer string, peerConnection *webrtc.PeerConnection) str
 	return answer.SDP
 }
 
-func WriteOutgoingTrack(peerConnection *webrtc.PeerConnection, track *webrtc.TrackLocalStaticRTP) {
-	// Read the SDP file that describes the RTP stream
-	sdpBytes, err := os.ReadFile("./data/output.sdp")
-	sdpTimeout := time.After(2 * time.Minute)
-	retryInterval := 2 * time.Second
-
-	for err != nil {
-		select {
-		case <-sdpTimeout:
-			log.Fatal("Timed out reading SDP file:", err)
-			return
-		default:
-			log.Warn("Error reading SDP file, retrying in 2 seconds:", err)
-			time.Sleep(retryInterval)
-			sdpBytes, err = os.ReadFile("./data/output.sdp")
-		}
-	}
-
-	// Parse the SDP file
-	sdpString := string(sdpBytes)
-	if sdpString == "" {
-		log.Fatal("SDP file is empty")
-	}
-
-	// Remove the first line of the SDP file
-	// sdpString = strings.Split(sdpString, "\n")[1]
-	sdpBytes = []byte(sdpString)
-
-	var session sdp.SessionDescription
-	if err := session.Unmarshal(sdpBytes); err != nil {
-		log.Fatal("Error unmarshalling SDP:", err)
-	}
-
-	var listenIP string
-	var listenPort int
-
-	if session.ConnectionInformation != nil && session.ConnectionInformation.Address != nil {
-		listenIP = session.ConnectionInformation.Address.Address
-	}
-
-	for _, md := range session.MediaDescriptions {
-		if md.MediaName.Media == "video" {
-			if md.ConnectionInformation != nil && md.ConnectionInformation.Address != nil {
-				listenIP = md.ConnectionInformation.Address.Address
-			}
-			listenPort = md.MediaName.Port.Value
-			break
-		}
-	}
-
-	if listenIP == "" {
-		// fallback for no c value
-		listenIP = "0.0.0.0"
-	}
-	if listenPort == 0 {
-		log.Fatal("No video port found in SDP")
-	}
-
-	listenAddr := fmt.Sprintf("%s:%d", listenIP, listenPort)
-	udpConn, err := net.ListenPacket("udp", listenAddr)
+func StreamMPEGTSToTrack(track *webrtc.TrackLocalStaticRTP) {
+	capture, err := gocv.OpenVideoCapture("udp://127.0.0.1:1234")
 	if err != nil {
-		log.Fatal("Error listening on UDP:", err)
+		log.Error("Error opening video capture:", err)
+		return
 	}
-	defer udpConn.Close()
+	defer capture.Close()
 
-	log.Info("Listening for incoming RTP packets on", listenAddr)
+	fps := 60
+	maxPayloadSize := 1200
+	var sequenceNumber uint16 = 0
+	var timestamp uint32 = 0
+	ssrc := uint32(rand.Uint32())
 
-	go func() {
-		buf := make([]byte, 1500) // UDP MTU
-		for {
-			n, _, err := udpConn.ReadFrom(buf)
-			if err != nil {
-				log.Error("Error reading from UDP:", err)
-				return
+	ticker := time.NewTicker(time.Second / time.Duration(fps))
+	defer ticker.Stop()
+
+	for range ticker.C {
+		frame := gocv.NewMat()
+		if ok := capture.Read(&frame); !ok || frame.Empty() {
+			log.Error("Error reading frame from capture")
+			frame.Close()
+			continue
+		}
+
+		// Encode the frame to JPEG
+		buf, err := gocv.IMEncode(".jpg", frame)
+		frame.Close()
+		if err != nil {
+			log.Error("Error encoding frame to JPEG:", err)
+			buf.Close()
+			continue
+		}
+
+		jpegBytes := make([]byte, buf.Len())
+		copy(jpegBytes, buf.GetBytes())
+		buf.Close()
+
+		packets := packetizeJPEG(jpegBytes, maxPayloadSize)
+		for i, payload := range packets {
+			marker := (i == len(packets)-1)
+			rtpPacket := &rtp.Packet{
+				Header: rtp.Header{
+					Version:        2,
+					PayloadType:   97, // Use a dynamic payload type (96-127) for JPEG
+					SequenceNumber: sequenceNumber,
+					Timestamp:      timestamp,
+					SSRC:           ssrc,
+					Marker: 	   marker,
+				},
+				Payload: payload,
 			}
-
-			var pkt rtp.Packet
-			if err := pkt.Unmarshal(buf[:n]); err != nil {
-				log.Error("Error unmarshalling RTP packet:", err)
-				continue
-			}
-
-			if err := track.WriteRTP(&pkt); err != nil {
+			sequenceNumber++
+			if err := track.WriteRTP(rtpPacket); err != nil {
 				log.Error("Error writing RTP packet:", err)
 			}
 		}
-	}()
-
-	// Block indefinitely
-	select {}
+		timestamp += 90000 / uint32(fps)
+	}
 }
 
-func HandleIncomingTrack(track *webrtc.TrackRemote, data chan []byte) {
+func packetizeJPEG(jpegData []byte, maxPayloadSize int) [][]byte {
+    const jpegHeaderSize = 8
+    var packets [][]byte
+    dataLen := len(jpegData)
+    offset := 0
+
+    // Determine the header values. These may come from the JPEG's metadata or be set statically.
+    typeSpecific := byte(0)
+    jpegType := byte(1)     // Example value; choose the one that matches your use case.
+    quality := byte(255)    // Maximum quality by default.
+    width := byte(1280 / 8) // In 8-pixel units.
+    height := byte(720 / 8)
+
+    for offset < dataLen {
+        // Reserve space for header.
+        chunkSize := maxPayloadSize - jpegHeaderSize
+        if offset+chunkSize > dataLen {
+            chunkSize = dataLen - offset
+        }
+
+        // Create header.
+        header := make([]byte, jpegHeaderSize)
+        header[0] = typeSpecific
+        // Fragment offset is 3 bytes; big endian.
+        header[1] = byte((offset >> 16) & 0xFF)
+        header[2] = byte((offset >> 8) & 0xFF)
+        header[3] = byte(offset & 0xFF)
+        header[4] = jpegType
+        header[5] = quality
+        header[6] = width
+        header[7] = height
+
+        // Combine header with the JPEG chunk.
+        packet := make([]byte, jpegHeaderSize+chunkSize)
+        copy(packet[:jpegHeaderSize], header)
+        copy(packet[jpegHeaderSize:], jpegData[offset:offset+chunkSize])
+        packets = append(packets, packet)
+
+        offset += chunkSize
+    }
+    return packets
+}
+
+func isValidJPEG(data []byte) bool {
+    if len(data) < 4 {
+        return false
+    }
+    return data[0] == 0xFF && data[1] == 0xD8 &&
+           data[len(data)-2] == 0xFF && data[len(data)-1] == 0xD9
+}
+
+// NewJitterBuffer creates a new jitter buffer with the given maximum delay.
+func NewJitterBuffer(maxDelay time.Duration) *JitterBuffer {
+	jb := &JitterBuffer{
+		inputChan:  make(chan *rtp.Packet, 100),
+		outputChan: make(chan *rtp.Packet, 100),
+		maxDelay:   maxDelay,
+		buffer:     []bufferedPacket{},
+	}
+	go jb.run()
+	return jb
+}
+
+func (jb *JitterBuffer) run() {
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case pkt := <-jb.inputChan:
+			jb.mu.Lock()
+			jb.buffer = append(jb.buffer, bufferedPacket{packet: pkt, arrival: time.Now()})
+			jb.mu.Unlock()
+		case <-ticker.C:
+			now := time.Now()
+			var ready []bufferedPacket
+			jb.mu.Lock()
+			var remaining []bufferedPacket
+			for _, bp := range jb.buffer {
+				if now.Sub(bp.arrival) >= jb.maxDelay {
+					ready = append(ready, bp)
+				} else {
+					remaining = append(remaining, bp)
+				}
+			}
+			jb.buffer = remaining
+			jb.mu.Unlock()
+
+			if len(ready) > 0 {
+				// Sort the ready packets by sequence number.
+				sort.Slice(ready, func(i, j int) bool {
+					return ready[i].packet.SequenceNumber < ready[j].packet.SequenceNumber
+				})
+				for _, bp := range ready {
+					jb.outputChan <- bp.packet
+				}
+			}
+		}
+	}
+}
+
+// Input returns the input channel to feed RTP packets into.
+func (jb *JitterBuffer) Input() chan<- *rtp.Packet {
+	return jb.inputChan
+}
+
+// Output returns the output channel from which sorted RTP packets can be read.
+func (jb *JitterBuffer) Output() <-chan *rtp.Packet {
+	return jb.outputChan
+}
+
+
+func HandleIncomingTrack(track *webrtc.TrackRemote, data chan *rtp.Packet) {
 	// receive rtp packets, use gocv to write to camera feed
 	for {
-		rtp, _, err := track.ReadRTP()
+		packet, _, err := track.ReadRTP()
 		if err != nil {
 			log.Error("Error reading RTP packet:", err)
 			break
 		}
 
 		// send rtp to channel
-		data <- rtp.Payload
+		data <- packet
 	}
 }
 
-func WriteToUDP(data chan []byte) {
+// func WriteToUDP(packets chan *rtp.Packet) {
+//     ffmpegCmd := exec.Command("ffmpeg",
+//         "-f", "image2pipe",
+// 		"-vcodec", "mjpeg",
+//         "-i", "pipe:0",
+//         "-c:v", "mpeg2video",
+// 		"-b:v", "30M",
+// 		"-maxrate", "30M",
+// 		"-bufsize", "60M",
+//         "-preset", "ultrafast",
+//         "-tune", "zerolatency",
+//         "-f", "mpegts",
+//         "udp://127.0.0.1:10000",
+// 		// "output.ts",
+//     )
+
+//     ffmpegStdin, err := ffmpegCmd.StdinPipe()
+//     if err != nil {
+//         log.Fatalf("Error getting ffmpeg stdin pipe: %v", err)
+//     }
+
+//     ffmpegStderr, err := ffmpegCmd.StderrPipe()
+//     if err != nil {
+//         log.Fatalf("Error getting ffmpeg stderr pipe: %v", err)
+//     }
+
+//     go func() {
+//         scanner := bufio.NewScanner(ffmpegStderr)
+//         for scanner.Scan() {
+//             log.Infof("ffmpeg: %s", scanner.Text())
+//         }
+//         if err := scanner.Err(); err != nil {
+//             log.Errorf("Error reading ffmpeg stderr: %v", err)
+//         }
+//     }()
+
+//     err = ffmpegCmd.Start()
+//     if err != nil {
+//         log.Fatalf("Error starting ffmpeg: %v", err)
+//     }
+
+// 	fragmentBuffer := make(map[int][]byte)
+// 	expectedTotalSize := -1
+
+// 	for packet := range packets {
+// 		if len(packet.Payload) < 8 {
+//         	log.Error("packet too small to extract JPEG header")
+//         	continue
+//     	}
+//     	header := packet.Payload[:8]
+//     	// Calculate fragment offset from header (big-endian)
+//     	fragmentOffset := int(header[1])<<16 | int(header[2])<<8 | int(header[3])
+//     	payload := packet.Payload[8:]
+		
+//     	fragmentBuffer[fragmentOffset] = payload
+		
+//     	if packet.Marker {
+//     	    expectedTotalSize = fragmentOffset + len(payload)
+//     	}
+		
+// 		// Try to reassemble if we know the total size
+// 		if expectedTotalSize > 0 {
+// 			complete := true
+// 			frameData := make([]byte, expectedTotalSize)
+// 			for offset := 0; offset < expectedTotalSize; {
+// 				frag, exists := fragmentBuffer[offset]
+// 				if !exists {
+// 					complete = false
+// 					break
+// 				}
+// 				copy(frameData[offset:], frag)
+// 				offset += len(frag)
+// 			}
+// 			if complete {
+// 				if !isValidJPEG(frameData) {
+// 					log.Warn("Invalid JPEG frame")
+// 				} else {
+// 					if _, err := ffmpegStdin.Write(frameData); err != nil {
+// 						log.Fatalf("Error writing to ffmpeg stdin: %v", err)
+// 					}
+// 				}
+// 				// Reset for next frame
+// 				fragmentBuffer = make(map[int][]byte)
+// 				expectedTotalSize = -1
+// 			}
+// 		}
+// 	}
+// }
+
+func WriteToUDP(packets chan *rtp.Packet) {
 	ffmpegCmd := exec.Command("ffmpeg",
-		"-f", "h264",
-		"-pixel_format", "yuv420p",
-		"-video_size", "1920x1080", //* This has to match python
-		"-framerate", "30",
+		"-f", "image2pipe",
+		"-vcodec", "mjpeg",
 		"-i", "pipe:0",
-		"-c:v", "copy",
+		"-c:v", "mpeg2video",
+		"-b:v", "30M",
+		"-maxrate", "30M",
+		"-bufsize", "60M",
 		"-preset", "ultrafast",
 		"-tune", "zerolatency",
 		"-f", "mpegts",
-		"udp://127.0.0.1:5000",
+		"udp://127.0.0.1:10000",
 	)
 
 	ffmpegStdin, err := ffmpegCmd.StdinPipe()
@@ -442,42 +624,109 @@ func WriteToUDP(data chan []byte) {
 		log.Fatalf("Error getting ffmpeg stdin pipe: %v", err)
 	}
 
+	ffmpegStderr, err := ffmpegCmd.StderrPipe()
+	if err != nil {
+		log.Fatalf("Error getting ffmpeg stderr pipe: %v", err)
+	}
+
+	go func() {
+		scanner := bufio.NewScanner(ffmpegStderr)
+		for scanner.Scan() {
+			log.Infof("ffmpeg: %s", scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			log.Errorf("Error reading ffmpeg stderr: %v", err)
+		}
+	}()
+
 	err = ffmpegCmd.Start()
 	if err != nil {
 		log.Fatalf("Error starting ffmpeg: %v", err)
 	}
 
-	for d := range data {
-		_, err := ffmpegStdin.Write(d)
-		if err != nil {
-			log.Fatalf("Error writing to ffmpeg stdin: %v", err)
+	// Create a jitter buffer with a 50ms delay.
+	jb := NewJitterBuffer(100 * time.Millisecond)
+	go func() {
+		for pkt := range packets {
+			jb.Input() <- pkt
+		}
+	}()
+
+	fragmentBuffer := make(map[int][]byte)
+	expectedTotalSize := -1
+	var lastPacketTime time.Time
+
+	// Process packets from the jitter buffer.
+	for packet := range jb.Output() {
+		if len(packet.Payload) < 8 {
+			log.Error("packet too small to extract JPEG header")
+			continue
+		}
+		header := packet.Payload[:8]
+		fragmentOffset := int(header[1])<<16 | int(header[2])<<8 | int(header[3])
+		payload := packet.Payload[8:]
+
+		if fragmentOffset == 0 && len(fragmentBuffer) > 0 {
+			log.Warn("New frame detected. Flushing incomplete frame.")
+			fragmentBuffer = make(map[int][]byte)
+			expectedTotalSize = -1
+		}
+
+		fragmentBuffer[fragmentOffset] = payload
+
+		if packet.Marker {
+			expectedTotalSize = fragmentOffset + len(payload)
+		}
+
+		now := time.Now()
+		if lastPacketTime.IsZero() {
+			lastPacketTime = now
+		} else if now.Sub(lastPacketTime) > 60*time.Millisecond {
+			// Flush the buffer if we haven't completed the frame in 100ms.
+			if expectedTotalSize > 0 {
+				complete := true
+				for offset := 0; offset < expectedTotalSize; {
+					frag, exists := fragmentBuffer[offset]
+					if !exists {
+						complete = false
+						break
+					}
+					offset += len(frag)
+				}
+			if !complete {
+				log.Warn("Frame incomplete after timeout. Flushing buffer.")
+				fragmentBuffer = make(map[int][]byte)
+				expectedTotalSize = -1
+			}
+		}
+		lastPacketTime = now
+	}
+
+		if expectedTotalSize > 0 {
+			complete := true
+			frameData := make([]byte, expectedTotalSize)
+			offset := 0
+			for offset < expectedTotalSize {
+				frag, exists := fragmentBuffer[offset]
+				if !exists {
+					complete = false
+					break
+				}
+				copy(frameData[offset:], frag)
+				offset += len(frag)
+			}
+			if complete {
+				if !isValidJPEG(frameData) {
+					log.Warn("Invalid JPEG frame")
+				} else {
+					if _, err := ffmpegStdin.Write(frameData); err != nil {
+						log.Fatalf("Error writing to ffmpeg stdin: %v", err)
+					}
+				}
+				fragmentBuffer = make(map[int][]byte)
+				expectedTotalSize = -1
+				lastPacketTime = time.Time{}
+			}
 		}
 	}
 }
-
-// func WriteToCamera(data chan []byte) {
-//     virtualCam, err := gocv.VideoWriterFile("/dev/video0", "MJPG", 60, 1920, 1080, true)
-//     if err != nil {
-//         log.Fatal("Error opening virtual camera:", err)
-//     }
-//     defer virtualCam.Close()
-    
-//     var img gocv.Mat
-//     for imgBytes := range data {
-//         newImg, err := gocv.IMDecode(imgBytes, gocv.IMReadColor)
-//         if err != nil {
-//             log.Error("Error decoding image bytes:", err)
-//             continue
-//         }
-//         // Close previous Mat if it was allocated
-//         if !img.Empty() {
-//             img.Close()
-//         }
-//         img = newImg
-//         virtualCam.Write(img)
-//     }
-//     // Final cleanup
-//     if !img.Empty() {
-//         img.Close()
-//     }
-// }

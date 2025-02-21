@@ -22,4 +22,5 @@ var (
 	ServerBinaryPath  = "./server/server.exe"
 	DataDir           = "./data/"
 	DeepFaceLivePath  = "./DeepFaceLive/"
+	FaceImgPath       = "./face.jpg"
 )
